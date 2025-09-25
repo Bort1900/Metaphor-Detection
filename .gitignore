@@ -2,3 +2,4 @@
 *.txt
 *.bz2
 *.bin
+__pycache__
