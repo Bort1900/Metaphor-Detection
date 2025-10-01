@@ -2,7 +2,8 @@ import wordnet
 import pandas as pd
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
-
+import random
+import math
 
 class TargetWord:
     def __init__(self, token, wn):
@@ -40,3 +41,17 @@ class DataSet:
 
     def __init__(self, filepath, extraction_function):
         self.sentences = extraction_function(filepath)
+    
+    def get_splits(self,splits):
+        '''
+            returns train, dev and test splits of the data, proportions can be given in this order
+        '''
+        if len(splits)!= 3:
+            raise ValueError("Please give one value for train, development and test split each")
+        if sum(splits)>1:
+            raise ValueError("Splits mustn't add to more than 100%")    
+        num_train = math.floor(len(self.sentences)*splits[0])
+        num_dev = math.floor(len(self.sentences)*splits[1])
+        num_test = math.floor(len(self.sentences)*splits[2])
+        partitions = random.sample(self.sentences,k=num_train+num_dev+num_test)
+        return partitions[:num_train],partitions[num_train:num_train+num_dev],partitions[num_train+num_dev:num_train+num_dev+num_test]

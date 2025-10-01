@@ -1,6 +1,7 @@
 from data import DataSet,Sentence,TargetWord
 import pandas as pd
 from wordnet import WordNetInterface
+wn = WordNetInterface()
 urban_dataset= "/projekte/semrel/Annotations/Figurative-Language/multilingual_EN_DE_SI_lit-fig_v-obj_abstract-concrete/English/example_sentences_verb-object.tsv"
 def urban_extractor(filepath):
     sentences = []
@@ -19,5 +20,6 @@ def urban_extractor(filepath):
     return sentences
 
 if __name__ == "__main__":
-    wn = WordNetInterface()
-    DataSet(urban_dataset,urban_extractor)
+    data = DataSet(urban_dataset,urban_extractor)
+    partitions = data.get_splits([0,0.05,0.95])
+    print(len(partitions[0]),len(partitions[1]),partitions[1][0].tokens,len(partitions[2]),partitions[2][0].tokens)
