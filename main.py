@@ -1,8 +1,8 @@
-from data import DataSet,Sentence,TargetWord
+from data import DataSet,Sentence
+import fasttext
 import pandas as pd
+from model import MaoModel
 from wordnet import WordNetInterface
-wn = WordNetInterface()
-urban_dataset= "/projekte/semrel/Annotations/Figurative-Language/multilingual_EN_DE_SI_lit-fig_v-obj_abstract-concrete/English/example_sentences_verb-object.tsv"
 def urban_extractor(filepath):
     sentences = []
     fail_counter = 0
@@ -11,7 +11,7 @@ def urban_extractor(filepath):
             datapoint = line.split("\t")
             if datapoint[2]!="unsure" and datapoint[1]==datapoint[2]:
                 try:
-                    sentence = Sentence(datapoint[3],datapoint[0].split()[0],datapoint[2],wn)
+                    sentence = Sentence(datapoint[3],datapoint[0].split()[0],datapoint[2])
                     sentences.append(sentence)
                 except ValueError:
                     print("Target word not in sentence")
@@ -20,6 +20,10 @@ def urban_extractor(filepath):
     return sentences
 
 if __name__ == "__main__":
+    wn = WordNetInterface()
+    urban_dataset= "/projekte/semrel/Annotations/Figurative-Language/multilingual_EN_DE_SI_lit-fig_v-obj_abstract-concrete/English/example_sentences_verb-object.tsv"
+    fasttext_dir="/projekte/semrel/WORK-AREA/Users/navid/wiki.en.bin"
+    embeddings = fasttext.load_model(fasttext_dir)
     data = DataSet(urban_dataset,urban_extractor)
-    partitions = data.get_splits([0,0.05,0.95])
-    print(len(partitions[0]),len(partitions[1]),partitions[1][0].tokens,len(partitions[2]),partitions[2][0].tokens)
+    train_data,dev_data,test_data = data.get_splits([0,0.05,0.95])
+    model = MaoModel(dev_data,test_data,wn,embeddings)
