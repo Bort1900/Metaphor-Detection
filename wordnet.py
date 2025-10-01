@@ -92,6 +92,13 @@ class WordNetInterface:
 
     def get_hypernyms(self, token):
         return self.concat_list_column(self.hypernym_synsets[self.hypernym_synsets["hyponym"]==token]["hypernyms"])
+    
+    def get_candidate_set(self,token):
+        candidates = set()
+        candidates.update(self.get_synonyms(token))
+        candidates.update(set(self.get_hypernyms(token)))
+        return candidates
+    
     @staticmethod
     def concat_list_column(col):
         return col.agg(lambda x: sum(x,[]))
