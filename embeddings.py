@@ -10,7 +10,7 @@ class FasttextModel:
         return self.model.get_word_vector(token)
 
     def get_output_vector(self, token):
-        return self.model.get_output_matrix[self.model.get_word_id(token)]
+        return self.model.get_output_matrix()[self.model.get_word_id(token)]
 
     # def train(self, min_count=1):
     #     model = fasttext.train_unsupervised(input=self.data_file, model=self.model_type, min_count=min_count)
