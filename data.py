@@ -1,4 +1,4 @@
-import wordnet
+import wordnet_interface
 import pandas as pd
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize

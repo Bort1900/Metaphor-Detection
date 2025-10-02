@@ -1,8 +1,8 @@
 from data import DataSet,Sentence
-import fasttext
+from embeddings import FasttextModel
 import pandas as pd
 from model import MaoModel
-from wordnet import WordNetInterface
+from wordnet_interface import WordNetInterface
 def urban_extractor(filepath):
     sentences = []
     fail_counter = 0
@@ -23,7 +23,8 @@ if __name__ == "__main__":
     wn = WordNetInterface()
     urban_dataset= "/projekte/semrel/Annotations/Figurative-Language/multilingual_EN_DE_SI_lit-fig_v-obj_abstract-concrete/English/example_sentences_verb-object.tsv"
     fasttext_dir="/projekte/semrel/WORK-AREA/Users/navid/wiki.en.bin"
-    embeddings = fasttext.load_model(fasttext_dir)
+    embeddings = FasttextModel(fasttext_dir)
     data = DataSet(urban_dataset,urban_extractor)
     train_data,dev_data,test_data = data.get_splits([0,0.05,0.95])
     model = MaoModel(dev_data,test_data,wn,embeddings)
+    
