@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+from nltk.corpus import stopwords
 
 
 class WordNetInterface:
@@ -8,7 +9,7 @@ class WordNetInterface:
         self.token_to_synset_ids, self.synset_id_to_token, self.hypernym_synsets = (
             self.init_index_tables()
         )
-
+        self.stops=stopwords.words("english")
     def init_index_tables(self):
         # token to synset tables
         nouns = pd.read_csv(
@@ -114,4 +115,6 @@ class WordNetInterface:
         candidates = set()
         candidates.update(self.get_synonyms(token, pos))
         candidates.update(set(self.get_hypernyms(token, pos)))
+        candidates.difference_update(self.stops)
+        candidates.add(token)
         return candidates
