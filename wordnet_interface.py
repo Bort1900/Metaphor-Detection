@@ -49,7 +49,7 @@ class WordNetInterface:
         )
         syn_nouns["POS"] = "NN"
         syn_verbs["POS"] = "V"
-        synset_to_token = pd.concat([syn_nouns, syn_verbs]).set_index("id")
+        synset_to_token = pd.concat([syn_nouns, syn_verbs])
         synset_to_token["tokens"] = synset_to_token["tokens"].apply(
             lambda x: [token.strip() for token in str(x).split(",")]
         )
@@ -86,13 +86,16 @@ class WordNetInterface:
             ]["ids"]
         )
 
-    def get_tokens_from_id(self, id):
-        return self.synset_id_to_token.loc[id]["tokens"]
+    def get_tokens_from_id(self, id, pos):
+        return self.synset_id_to_token.loc[
+            (self.synset_id_to_token["id"] == id)
+            & (self.synset_id_to_token["POS"] == pos)
+        ]
 
     def get_synonyms(self, token, pos):
         output = set()
         for id in self.get_synset_ids(token, pos):
-            output.update(set(self.get_tokens_from_id(id)))
+            output.update(set(self.get_tokens_from_id(id,pos)))
         return output
 
     def get_hypernyms(self, token, pos):
