@@ -2,6 +2,7 @@ from data import DataSet,Sentence
 from embeddings import FasttextModel
 import pandas as pd
 from model import MaoModel
+import time
 from wordnet_interface import WordNetInterface
 def urban_extractor(filepath):
     sentences = []
@@ -27,5 +28,6 @@ if __name__ == "__main__":
     data = DataSet(urban_dataset,urban_extractor)
     train_data,dev_data,test_data = data.get_splits([0,0.05,0.95])
     model = MaoModel(dev_data,test_data,wn,embeddings)
+    print(dev_data[0].tokens,dev_data[0].target)
     print(model.best_fit(dev_data[0],True))
     

@@ -1,6 +1,7 @@
 import random
 from data import Vectors
 import numpy as np
+import time
 
 
 class MaoModel:
@@ -45,8 +46,7 @@ class MaoModel:
                 try:
                     candidate_vector = self.embeddings.get_output_vector(candidate)
                 except ValueError:
-                    print("Word not in dictionary, using input vector")
-                    candidate_vector = self.embeddings.get_input_vector(candidate)
+                    print(f"Word {candidate} not in dictionary, ignoring candidate")
             else:
                 candidate_vector = self.embeddings.get_input_vector(candidate)
             similarity = Vectors.cos_sim(candidate_vector, context_vector)
