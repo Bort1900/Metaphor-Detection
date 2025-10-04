@@ -27,4 +27,5 @@ if __name__ == "__main__":
     data = DataSet(urban_dataset,urban_extractor)
     train_data,dev_data,test_data = data.get_splits([0,0.05,0.95])
     model = MaoModel(dev_data,test_data,wn,embeddings)
+    print(model.best_fit(dev_data[0],True))
     

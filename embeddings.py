@@ -11,10 +11,10 @@ class FasttextModel:
         return self.model.get_word_vector(token)
 
     def get_output_vector(self, token):
-        word_id = self.model.get_word_id()
+        word_id = self.model.get_word_id(token)
         if word_id==-1:
             raise ValueError("Word not in dictionary")
-        return self.model.get_output_matrix()[self.model.get_word_id(token)]
+        return self.model.get_output_matrix()[word_id]
     def get_mean_vector(self,tokens):
         embeddings = [
             self.get_input_vector(token) for token in tokens
