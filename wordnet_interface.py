@@ -90,7 +90,7 @@ class WordNetInterface:
         return self.synset_id_to_token[
             (self.synset_id_to_token["id"] == id)
             & (self.synset_id_to_token["POS"] == pos)
-        ]["tokens"]
+        ].iloc[0]["tokens"]
 
     def get_synonyms(self, token, pos):
         output = set()
