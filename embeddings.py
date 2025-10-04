@@ -1,4 +1,5 @@
 import fasttext
+import numpy as np
 
 
 class FasttextModel:
@@ -10,7 +11,15 @@ class FasttextModel:
         return self.model.get_word_vector(token)
 
     def get_output_vector(self, token):
+        word_id = self.model.get_word_id()
+        if word_id==-1:
+            raise ValueError("Word not in dictionary")
         return self.model.get_output_matrix()[self.model.get_word_id(token)]
+    def get_mean_vector(self,tokens):
+        embeddings = [
+            self.get_input_vector(token) for token in tokens
+        ]
+        return np.mean(embeddings, axis=0)
 
     # def train(self, min_count=1):
     #     model = fasttext.train_unsupervised(input=self.data_file, model=self.model_type, min_count=min_count)

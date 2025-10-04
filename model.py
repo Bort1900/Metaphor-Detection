@@ -1,4 +1,5 @@
 import random
+from data import Vectors
 import numpy as np
 
 
@@ -34,9 +35,22 @@ class MaoModel:
     def predict(self, sentence):
         pass
 
-    def best_fit(self, sentence):
+    def best_fit(self, sentence, use_output_vec):
         candidate_set = self.wn.get_candidate_set(sentence.target)
-        context_embeddings = [
-            self.embeddings.get_input_vector(token) for token in sentence.context
-        ]
-        context_vector = np.mean(context_embeddings, axis=0)
+        best_similarity = -1
+        context_vector = self.embeddings.get_mean_vector(sentence.context)
+        best_candidate = sentence.target
+        for candidate in candidate_set:
+            if use_output_vec:
+                try:
+                    candidate_vector = self.embeddings.get_output_vector(candidate)
+                except ValueError:
+                    print("Word not in dictionary, using input vector")
+                    candidate_vector = self.embeddings.get_input_vector(candidate)
+            else:
+                candidate_vector = self.embeddings.get_input_vector(candidate)
+            similarity = Vectors.cos_sim(candidate_vector, context_vector)
+            if similarity >= best_similarity:
+                best_similarity = similarity
+                best_candidate = candidate
+        return best_candidate

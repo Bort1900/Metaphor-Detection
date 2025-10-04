@@ -4,6 +4,7 @@ from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
 import random
 import math
+import numpy as np
 
 
 class Sentence:
@@ -61,3 +62,9 @@ class DataSet:
             partitions[num_train : num_train + num_dev],
             partitions[num_train + num_dev : num_train + num_dev + num_test],
         )
+
+
+class Vectors:
+    @staticmethod
+    def cos_sim(vec1, vec2):
+        return float(np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2)))
