@@ -33,8 +33,14 @@ class MaoModel:
                 correct_predictions / (correct_predictions + incorrect_predictions),
             )
 
-    def predict(self, sentence):
-        pass
+    def predict(self, sentence, use_output_vec):
+        predicted_sense = self.best_fit(sentence, use_output_vec)
+        target_vector = self.embeddings.get_input_vector(sentence.target)
+        predicted_vector = self.embeddings.get_input_vector(predicted_sense)
+        print(predicted_sense, sentence.target)
+        similarity = Vectors.cos_sim(target_vector, predicted_vector)
+        print(similarity)
+        return similarity < self.decision_threshold
 
     def best_fit(self, sentence, use_output_vec):
         candidate_set = self.wn.get_candidate_set(sentence.target, "V")
@@ -42,7 +48,6 @@ class MaoModel:
         context_vector = self.embeddings.get_mean_vector(sentence.context)
         best_candidate = sentence.target
         for candidate in candidate_set:
-            print(candidate)
             if use_output_vec:
                 try:
                     candidate_vector = self.embeddings.get_output_vector(candidate)
@@ -52,7 +57,6 @@ class MaoModel:
             else:
                 candidate_vector = self.embeddings.get_input_vector(candidate)
             similarity = Vectors.cos_sim(candidate_vector, context_vector)
-            print(similarity)
             if similarity >= best_similarity:
                 best_similarity = similarity
                 best_candidate = candidate
