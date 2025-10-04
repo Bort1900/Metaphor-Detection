@@ -42,14 +42,17 @@ class MaoModel:
         context_vector = self.embeddings.get_mean_vector(sentence.context)
         best_candidate = sentence.target
         for candidate in candidate_set:
+            print(candidate)
             if use_output_vec:
                 try:
                     candidate_vector = self.embeddings.get_output_vector(candidate)
                 except ValueError:
                     print(f"Word {candidate} not in dictionary, ignoring candidate")
+                    continue
             else:
                 candidate_vector = self.embeddings.get_input_vector(candidate)
             similarity = Vectors.cos_sim(candidate_vector, context_vector)
+            print(similarity)
             if similarity >= best_similarity:
                 best_similarity = similarity
                 best_candidate = candidate
