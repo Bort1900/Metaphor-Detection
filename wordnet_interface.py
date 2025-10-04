@@ -87,15 +87,15 @@ class WordNetInterface:
         )
 
     def get_tokens_from_id(self, id, pos):
-        return self.synset_id_to_token.loc[
+        return self.synset_id_to_token[
             (self.synset_id_to_token["id"] == id)
             & (self.synset_id_to_token["POS"] == pos)
-        ]
+        ]["tokens"]
 
     def get_synonyms(self, token, pos):
         output = set()
         for id in self.get_synset_ids(token, pos):
-            output.update(set(self.get_tokens_from_id(id,pos)))
+            output.update(set(self.get_tokens_from_id(id, pos)))
         return output
 
     def get_hypernyms(self, token, pos):
