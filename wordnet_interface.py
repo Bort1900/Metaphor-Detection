@@ -79,11 +79,13 @@ class WordNetInterface:
         return token_to_synset, synset_to_token, hypernyms
 
     def get_synset_ids(self, token, pos):
-        return self.concat_list_column(
+        return (
             self.token_to_synset_ids[
                 (self.token_to_synset_ids["token"] == token)
                 & (self.token_to_synset_ids["POS"] == pos)
             ]["ids"]
+            .explode()
+            .tolist()
         )
 
     def get_tokens_from_id(self, id, pos):
@@ -99,11 +101,13 @@ class WordNetInterface:
         return output
 
     def get_hypernyms(self, token, pos):
-        return self.concat_list_column(
+        return (
             self.hypernym_synsets[
                 (self.hypernym_synsets["hyponym"] == token)
                 & (self.hypernym_synsets["POS"] == pos)
             ]["hypernyms"]
+            .explode()
+            .tolist()
         )
 
     def get_candidate_set(self, token, pos):
@@ -111,7 +115,3 @@ class WordNetInterface:
         candidates.update(self.get_synonyms(token, pos))
         candidates.update(set(self.get_hypernyms(token, pos)))
         return candidates
-
-    @staticmethod
-    def concat_list_column(col):
-        return col.agg(lambda x: sum(x, []))
