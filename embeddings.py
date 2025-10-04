@@ -1,4 +1,5 @@
 import fasttext
+import time
 import numpy as np
 
 
@@ -6,6 +7,7 @@ class FasttextModel:
     def __init__(self, load_file):
         self.model = fasttext.load_model(load_file)
         self.load_file = load_file
+        self.output_matrix=self.model.get_output_matrix()
 
     def get_input_vector(self, token):
         return self.model.get_word_vector(token)
@@ -14,7 +16,7 @@ class FasttextModel:
         word_id = self.model.get_word_id(token)
         if word_id==-1:
             raise ValueError("Word not in dictionary")
-        return self.model.get_output_matrix()[word_id]
+        return self.output_matrix[word_id]
     def get_mean_vector(self,tokens):
         embeddings = [
             self.get_input_vector(token) for token in tokens
