@@ -37,7 +37,7 @@ class MaoModel:
         pass
 
     def best_fit(self, sentence, use_output_vec):
-        candidate_set = self.wn.get_candidate_set(sentence.target)
+        candidate_set = self.wn.get_candidate_set(sentence.target, "V")
         best_similarity = -1
         context_vector = self.embeddings.get_mean_vector(sentence.context)
         best_candidate = sentence.target

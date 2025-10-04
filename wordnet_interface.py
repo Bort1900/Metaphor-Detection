@@ -78,27 +78,37 @@ class WordNetInterface:
 
         return token_to_synset, synset_to_token, hypernyms
 
-    def get_synset_ids(self, token):
-        return self.concat_list_column(self.token_to_synset_ids[self.token_to_synset_ids["token"]==token]["ids"])
+    def get_synset_ids(self, token, pos):
+        return self.concat_list_column(
+            self.token_to_synset_ids[
+                (self.token_to_synset_ids["token"] == token)
+                & (self.token_to_synset_ids["POS"] == pos)
+            ]["ids"]
+        )
 
     def get_tokens_from_id(self, id):
         return self.synset_id_to_token.loc[id]["tokens"]
 
-    def get_synonyms(self, token):
+    def get_synonyms(self, token, pos):
         output = set()
-        for id in self.get_synset_ids(token):
+        for id in self.get_synset_ids(token, pos):
             output.update(set(self.get_tokens_from_id(id)))
         return output
 
-    def get_hypernyms(self, token):
-        return self.concat_list_column(self.hypernym_synsets[self.hypernym_synsets["hyponym"]==token]["hypernyms"])
-    
-    def get_candidate_set(self,token):
+    def get_hypernyms(self, token, pos):
+        return self.concat_list_column(
+            self.hypernym_synsets[
+                (self.hypernym_synsets["hyponym"] == token)
+                & (self.hypernym_synsets["POS"] == pos)
+            ]["hypernyms"]
+        )
+
+    def get_candidate_set(self, token, pos):
         candidates = set()
-        candidates.update(self.get_synonyms(token))
-        candidates.update(set(self.get_hypernyms(token)))
+        candidates.update(self.get_synonyms(token, pos))
+        candidates.update(set(self.get_hypernyms(token, pos)))
         return candidates
-    
+
     @staticmethod
     def concat_list_column(col):
-        return col.agg(lambda x: sum(x,[]))
+        return col.agg(lambda x: sum(x, []))
