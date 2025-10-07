@@ -27,7 +27,11 @@ if __name__ == "__main__":
     embeddings = FasttextModel(fasttext_dir)
     data = DataSet(urban_dataset,urban_extractor)
     train_data,dev_data,test_data = data.get_splits([0,0.05,0.95])
-    model = MaoModel(dev_data,test_data,wn,embeddings)
-    print(dev_data[0].tokens,dev_data[0].target)
-    print(model.best_fit(dev_data[0],True))
+    in_out_model = MaoModel(dev_data,test_data,wn,embeddings,True)
+    in_in_model = MaoModel(dev_data,test_data,wn,embeddings,False)
+    in_in_model.train_threshold(0.05,5,True)
+    in_out_model.train_threshold(0.05,5,True)
+    in_out_model.evaluate()
+    in_in_model.evaluate()
+
     
