@@ -8,10 +8,11 @@ import numpy as np
 
 
 class Sentence:
-    def __init__(self, sentence, target, value):
+    def __init__(self, sentence, target, value, phrase):
         self.tokens = word_tokenize(sentence)
         self.target = target
         self.value = value
+        self.phrase = phrase
         wnl = WordNetLemmatizer()
         target_index = -1
         if target in self.tokens:

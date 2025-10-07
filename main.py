@@ -12,7 +12,7 @@ def urban_extractor(filepath):
             datapoint = line.split("\t")
             if datapoint[2]!="unsure" and datapoint[1]==datapoint[2]:
                 try:
-                    sentence = Sentence(datapoint[3],datapoint[0].split()[0],datapoint[2])
+                    sentence = Sentence(sentence=datapoint[3],target=datapoint[0].split()[0],value=datapoint[2],phrase=datapoint[0])
                     sentences.append(sentence)
                 except ValueError:
                     print("Target word not in sentence")
@@ -29,8 +29,8 @@ if __name__ == "__main__":
     train_data,dev_data,test_data = data.get_splits([0,0.05,0.95])
     in_out_model = MaoModel(dev_data,test_data,wn,embeddings,True)
     in_in_model = MaoModel(dev_data,test_data,wn,embeddings,False)
-    in_in_model.train_threshold(0.05,5,True)
-    in_out_model.train_threshold(0.05,5,True)
+    in_in_model.train_threshold(0.01,3,False)
+    in_out_model.train_threshold(0.01,3,False)
     in_out_model.evaluate()
     in_in_model.evaluate()
 
