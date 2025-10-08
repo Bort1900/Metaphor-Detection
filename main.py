@@ -1,37 +1,72 @@
-from data import DataSet,Sentence
+from data import DataSet, Sentence
 from embeddings import FasttextModel
 import pandas as pd
 from model import MaoModel
 import time
 from wordnet_interface import WordNetInterface
+
+
 def urban_extractor(filepath):
     sentences = []
     fail_counter = 0
     with open(filepath) as data:
         for line in data:
             datapoint = line.split("\t")
-            if datapoint[2]!="unsure" and datapoint[1]==datapoint[2]:
+            if datapoint[2] != "unsure" and datapoint[1] == datapoint[2]:
                 try:
-                    sentence = Sentence(sentence=datapoint[3],target=datapoint[0].split()[0],value=datapoint[2],phrase=datapoint[0])
+                    if datapoint[2] == "literal":
+                        value = 0
+                    elif datapoint[2] == "figurative":
+                        value = 1
+                    sentence = Sentence(
+                        sentence=datapoint[3],
+                        target=datapoint[0].split()[0],
+                        value=value,
+                        phrase=datapoint[0],
+                    )
                     sentences.append(sentence)
                 except ValueError:
                     print("Target word not in sentence")
-                    fail_counter+=1
-    print(len(sentences),fail_counter)
+                    fail_counter += 1
+    print(len(sentences), fail_counter)
     return sentences
+
+
+def mohammad_extractor(filepath):
+    sentences = []
+    fail_counter = 0
+    with open(filepath) as data:
+        data.readline()
+        for line in data:
+            datapoint = line.split("\t")
+            if float(datapoint[4]) >= 0.7 and len(datapoint) == 5:
+                try:
+                    if datapoint[2] == "literal":
+                        value = 0
+                    elif datapoint[2] == "metaphorical":
+                        value = 1
+                    sentence = Sentence(
+                        sentence=datapoint[2], target=datapoint[0], value=value
+                    )
+                    sentences.append(sentence)
+                except ValueError:
+                    print("Target word not in sentence")
+                    fail_counter += 1
+    print(len(sentences), fail_counter)
+    return sentences
+
 
 if __name__ == "__main__":
     wn = WordNetInterface()
-    urban_dataset= "/projekte/semrel/Annotations/Figurative-Language/multilingual_EN_DE_SI_lit-fig_v-obj_abstract-concrete/English/example_sentences_verb-object.tsv"
-    fasttext_dir="/projekte/semrel/WORK-AREA/Users/navid/wiki.en.bin"
+    urban_dataset = "/projekte/semrel/Annotations/Figurative-Language/multilingual_EN_DE_SI_lit-fig_v-obj_abstract-concrete/English/example_sentences_verb-object.tsv"
+    fasttext_dir = "/projekte/semrel/WORK-AREA/Users/navid/wiki.en.bin"
+    mohammad_dataset = "projekte/semrel/WORK-AREA/Users/navid/Metaphor-Emotion-Data-Files/Data-metaphoric-or-literal.txt"
     embeddings = FasttextModel(fasttext_dir)
-    data = DataSet(urban_dataset,urban_extractor)
-    train_data,dev_data,test_data = data.get_splits([0,0.05,0.95])
-    in_out_model = MaoModel(dev_data,test_data,wn,embeddings,True)
-    in_in_model = MaoModel(dev_data,test_data,wn,embeddings,False)
-    in_in_model.train_threshold(0.01,3,False)
-    in_out_model.train_threshold(0.01,3,False)
+    data = DataSet(mohammad_dataset, mohammad_extractor)
+    train_data, dev_data, test_data = data.get_splits([0, 0.05, 0.95])
+    in_out_model = MaoModel(dev_data, test_data, wn, embeddings, True)
+    in_in_model = MaoModel(dev_data, test_data, wn, embeddings, False)
+    in_in_model.train_threshold(0.1, 5, True)
+    in_out_model.train_threshold(0.1, 5, True)
     in_out_model.evaluate()
     in_in_model.evaluate()
-
-    

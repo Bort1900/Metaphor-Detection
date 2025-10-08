@@ -8,7 +8,13 @@ import numpy as np
 
 
 class Sentence:
-    def __init__(self, sentence, target, value, phrase):
+    def __init__(self, sentence, target, value, phrase="unknown"):
+        """
+        sentence: is the list of tokens
+        target: the token or its lemma which is the target for the label
+        value: the label, 0: literal, 1: figurative
+        phrase: the phrase containing the target if known
+        """
         self.tokens = word_tokenize(sentence)
         self.target = target
         self.value = value
@@ -26,17 +32,6 @@ class Sentence:
             raise ValueError("Target doesn't appear in sentence")
         else:
             self.context = self.tokens[:target_index] + self.tokens[target_index + 1 :]
-
-    def get_label(self):
-        """
-        0:literal,1: figurative
-        """
-        if self.value == "literal":
-            return 0
-        elif self.value == "figurative":
-            return 1
-        else:
-            raise ValueError("sentence must be figurative or literal")
 
 
 class DataSet:

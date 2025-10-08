@@ -22,9 +22,7 @@ class MaoModel:
             incorrect_predictions = 0
             random.shuffle(self.dev_data)
             for sentence in self.dev_data:
-                moment = time.time()
                 result = self.predict(sentence)
-                print("predicion",time.time()-moment)
                 if result > sentence.get_label():
                     self.decision_threshold -= increment
                     incorrect_predictions += 1
@@ -39,7 +37,6 @@ class MaoModel:
             )
             if reduce_inc:
                 increment /= 2
-            print("epoch",time.time()-initial)
 
     def evaluate(self):
         confusion_matrix = np.zeros([2, 2])
