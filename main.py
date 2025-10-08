@@ -18,6 +18,9 @@ def urban_extractor(filepath):
                         value = 0
                     elif datapoint[2] == "figurative":
                         value = 1
+                    else:
+                        print(f"{datapoint[2]} is not a valid value")
+                        raise ValueError(f"{datapoint[2]} is not a valid value")
                     sentence = Sentence(
                         sentence=datapoint[3],
                         target=datapoint[0].split()[0],
@@ -39,12 +42,15 @@ def mohammad_extractor(filepath):
         data.readline()
         for line in data:
             datapoint = line.split("\t")
-            if float(datapoint[4]) >= 0.7 and len(datapoint) == 5:
+            if len(datapoint) == 5 and float(datapoint[4]) >= 0.7:
                 try:
-                    if datapoint[2] == "literal":
+                    if datapoint[3] == "literal":
                         value = 0
-                    elif datapoint[2] == "metaphorical":
+                    elif datapoint[3] == "metaphorical":
                         value = 1
+                    else:
+                        print(f"{datapoint[3]} is not a valid value")
+                        raise ValueError(f"{datapoint[3]} is not a valid value")
                     sentence = Sentence(
                         sentence=datapoint[2], target=datapoint[0], value=value
                     )
@@ -60,13 +66,25 @@ if __name__ == "__main__":
     wn = WordNetInterface()
     urban_dataset = "/projekte/semrel/Annotations/Figurative-Language/multilingual_EN_DE_SI_lit-fig_v-obj_abstract-concrete/English/example_sentences_verb-object.tsv"
     fasttext_dir = "/projekte/semrel/WORK-AREA/Users/navid/wiki.en.bin"
-    mohammad_dataset = "projekte/semrel/WORK-AREA/Users/navid/Metaphor-Emotion-Data-Files/Data-metaphoric-or-literal.txt"
+    mohammad_dataset = "/projekte/semrel/WORK-AREA/Users/navid/Metaphor-Emotion-Data-Files/Data-metaphoric-or-literal.txt"
     embeddings = FasttextModel(fasttext_dir)
     data = DataSet(mohammad_dataset, mohammad_extractor)
     train_data, dev_data, test_data = data.get_splits([0, 0.05, 0.95])
-    in_out_model = MaoModel(dev_data, test_data, wn, embeddings, True)
-    in_in_model = MaoModel(dev_data, test_data, wn, embeddings, False)
-    in_in_model.train_threshold(0.1, 5, True)
-    in_out_model.train_threshold(0.1, 5, True)
-    in_out_model.evaluate()
-    in_in_model.evaluate()
+    in_out_model = MaoModel(
+        dev_data=dev_data,
+        test_data=test_data,
+        wn=wn,
+        embeddings=embeddings,
+        use_output_vec=True,
+    )
+    in_in_model = MaoModel(
+        dev_data=dev_data,
+        test_data=test_data,
+        wn=wn,
+        embeddings=embeddings,
+        use_output_vec=False,
+    )
+    # in_in_model.optimize_threshold(max_epochs=50)
+    # print(in_in_model.evaluate(in_in_model.test_data))
+    in_out_model.train_threshold(increment=0.05, epochs=10, batch_size=20)
+    print(in_out_model.evaluate(in_out_model.test_data))

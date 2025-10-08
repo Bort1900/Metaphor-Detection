@@ -3,6 +3,7 @@ from data import Vectors
 import numpy as np
 import time
 from tqdm import tqdm
+import math
 
 
 class MaoModel:
@@ -14,40 +15,87 @@ class MaoModel:
         self.embeddings = embeddings
         self.decision_threshold = 0.6
 
-    def train_threshold(self, increment, epochs, reduce_inc):
-        for i in range(epochs):
-            initial = time.time()
-            print(f"epoch {i+1}:")
-            correct_predictions = 0
-            incorrect_predictions = 0
-            random.shuffle(self.dev_data)
-            for sentence in self.dev_data:
-                result = self.predict(sentence)
-                if result > sentence.value:
-                    self.decision_threshold -= increment
-                    incorrect_predictions += 1
-                elif result < sentence.value:
-                    self.decision_threshold += increment
-                    incorrect_predictions += 1
-                else:
-                    correct_predictions += 1
-            print(
-                "Accuracy: ",
-                correct_predictions / (correct_predictions + incorrect_predictions),
-            )
-            if reduce_inc:
-                increment /= 2
+    def train_threshold(self, increment, epochs, batch_size=-1):
+        """
+        looks for optimal threshold by approximating recall to precision
+        increment: initial threshold change when approximating
+        epochs: number of times to go over development data
+        batch_size: number of datapoints after which threshold is aligned, if -1 the dataset will not be separated into batches
+        """
 
-    def evaluate(self):
+        if batch_size < 0:
+            batch_size = len(self.dev_data)
+        else:
+            batch_number = math.floor(len(self.dev_data) / batch_size)
+        alternating_counter = 0  # checks for jumping over optimum
+        for i in range(epochs):
+            random.shuffle(self.dev_data)
+            print(f"epoch {i+1}:")
+            batch_start = 0
+            for _ in range(batch_number):
+                precision, recall, f_score = self.evaluate(
+                    self.dev_data[batch_start : batch_start + batch_size]
+                )
+                print(
+                    f"Current_threshold: {self.decision_threshold}\nBatch F-score: {f_score}"
+                )
+                batch_start += batch_size
+                if recall < precision:
+                    self.decision_threshold += increment
+                    alternating_counter = max(0, alternating_counter * (-1) + 1)
+                elif precision < recall:
+                    self.decision_threshold -= increment
+                    alternating_counter = min(0, alternating_counter * (-1) - 1)
+                # 4 alternations between raising and lowering threshold
+                if abs(alternating_counter) >= 4:
+                    increment /= 2
+                print(alternating_counter)
+
+    def optimize_threshold(self, max_epochs=100):
+        increment = 0.1
+        self.decision_threshold = 0
+        direction = 1  # 1:upwards, -1 downwards
+        lower_bound = 0
+        i = 0
+        upper_bound = 1
+        last_f_score = self.evaluate(self.dev_data)[2]
+        while (
+            self.decision_threshold <= upper_bound
+            and self.decision_threshold >= lower_bound
+            and i < max_epochs
+        ):
+            self.decision_threshold += direction * increment
+            current_f_score = self.evaluate(self.dev_data)[2]
+            if current_f_score < last_f_score:
+                if direction == 1:
+                    upper_bound = self.decision_threshold
+                else:
+                    lower_bound = self.decision_threshold
+                increment /= 2
+                direction *= -1
+            last_f_score = current_f_score
+            print(self.decision_threshold, last_f_score, lower_bound, upper_bound)
+            i += 1
+
+    def evaluate(self, data):
         confusion_matrix = np.zeros([2, 2])
-        for sentence in tqdm(self.test_data):
+        for sentence in tqdm(data):
             prediction = self.predict(sentence)
             confusion_matrix[int(prediction), sentence.value] += 1
-        precision = float(confusion_matrix[1, 1] / confusion_matrix.sum(1)[1])
-        recall = float(confusion_matrix[1, 1] / confusion_matrix.sum(0)[1])
-        f_score = 2 * precision * recall / (precision + recall)
+        if confusion_matrix.sum(1)[1] == 0:
+            precision = 1
+        else:
+            precision = float(confusion_matrix[1, 1] / confusion_matrix.sum(1)[1])
+        if confusion_matrix.sum(0)[1] == 0:
+            recall = 1
+        else:
+            recall = float(confusion_matrix[1, 1] / confusion_matrix.sum(0)[1])
+        if precision + recall == 0:
+            f_score = 0
+        else:
+            f_score = 2 * precision * recall / (precision + recall)
         print(confusion_matrix)
-        print(f"Precision: {precision}, Recall: {recall}, F-Score: {f_score}")
+        return precision, recall, f_score
 
     def predict(self, sentence):
         predicted_sense = self.best_fit(sentence)
