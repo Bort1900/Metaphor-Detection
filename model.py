@@ -16,17 +16,17 @@ class MaoModel:
 
     def train_threshold(self, increment, epochs, reduce_inc):
         for i in range(epochs):
-            initial=time.time()
+            initial = time.time()
             print(f"epoch {i+1}:")
             correct_predictions = 0
             incorrect_predictions = 0
             random.shuffle(self.dev_data)
             for sentence in self.dev_data:
                 result = self.predict(sentence)
-                if result > sentence.get_label():
+                if result > sentence.value:
                     self.decision_threshold -= increment
                     incorrect_predictions += 1
-                elif result < sentence.get_label():
+                elif result < sentence.value:
                     self.decision_threshold += increment
                     incorrect_predictions += 1
                 else:
@@ -42,7 +42,7 @@ class MaoModel:
         confusion_matrix = np.zeros([2, 2])
         for sentence in tqdm(self.test_data):
             prediction = self.predict(sentence)
-            confusion_matrix[int(prediction), sentence.get_label()] += 1
+            confusion_matrix[int(prediction), sentence.value] += 1
         precision = float(confusion_matrix[1, 1] / confusion_matrix.sum(1)[1])
         recall = float(confusion_matrix[1, 1] / confusion_matrix.sum(0)[1])
         f_score = 2 * precision * recall / (precision + recall)
