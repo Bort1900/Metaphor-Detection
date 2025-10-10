@@ -10,7 +10,7 @@ import numpy as np
 class Sentence:
     def __init__(self, sentence, target, value, phrase="unknown"):
         """
-        sentence: is the list of tokens
+        sentence: string of the sentence
         target: the token or its lemma which is the target for the label
         value: the label, 0: literal, 1: figurative
         phrase: the phrase containing the target if known
