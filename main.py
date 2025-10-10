@@ -70,7 +70,7 @@ if __name__ == "__main__":
     fasttext_dir = "/projekte/semrel/WORK-AREA/Users/navid/wiki.en.bin"
     mohammad_dataset = "/projekte/semrel/WORK-AREA/Users/navid/Metaphor-Emotion-Data-Files/Data-metaphoric-or-literal.txt"
     embeddings = FasttextModel(fasttext_dir)
-    data = DataSet(mohammad_dataset, mohammad_dataset)
+    data = DataSet(mohammad_dataset, mohammad_extractor)
     train_data, dev_data, test_data = data.get_splits([0, 0.05, 0.95])
     in_out_model = MaoModel(
         dev_data=dev_data,
@@ -86,7 +86,7 @@ if __name__ == "__main__":
         embeddings=embeddings,
         use_output_vec=False,
     )
-    in_in_model.optimize_threshold(max_epochs=50)
+    in_in_model.find_best_threshold(steps=0.05)
     print(in_in_model.evaluate(in_in_model.test_data))
-    in_out_model.train_threshold(increment=0.05, epochs=10, batch_size=20)
+    in_out_model.find_best_threshold(steps=0.05)
     print(in_out_model.evaluate(in_out_model.test_data))

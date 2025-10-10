@@ -77,6 +77,19 @@ class MaoModel:
             print(self.decision_threshold, last_f_score, lower_bound, upper_bound)
             i += 1
 
+    def find_best_threshold(self, steps):
+        self.decision_threshold = 0
+        best_threshold = 0
+        best_f_score = 0
+        while self.decision_threshold < 1:
+            f_score = self.evaluate(self.dev_data)[2]
+            if f_score > best_f_score:
+                best_f_score = f_score
+                best_threshold = self.decision_threshold
+            self.decision_threshold += steps
+        self.decision_threshold = best_threshold
+        print(f"Best Threshold: {self.decision_threshold}, F-Score: {best_f_score}")
+
     def evaluate(self, data):
         confusion_matrix = np.zeros([2, 2])
         for sentence in tqdm(data):
