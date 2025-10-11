@@ -1,5 +1,5 @@
 import fasttext
-from sklearn.decomposition import TruncatedSVD
+from sklearn.decomposition import PCA
 import numpy as np
 
 
@@ -43,15 +43,19 @@ class WordAssociationEmbeddings:
 
     @staticmethod
     def create_graph_embeddings(
-        swow, index_file, embedding_file, alpha=0.75, dimensions=300, random_seed=50
+        swow,
+        index_file,
+        embedding_file,
+        alpha=0.75,
+        dimensions=300,
     ):
         matrix, indices = swow.get_association_strength_matrix(use_only_cues=True)
         with open(index_file, "w", encoding="utf-8") as output:
             for key in indices:
                 output.write(str(key) + "\n")
         embeddings = np.linalg.inv(np.identity(len(indices)) - matrix * alpha)
-        svd = TruncatedSVD(n_components=dimensions, random_state=random_seed)
-        embeddings = svd.fit_transform(embeddings)
+        pca = PCA(n_components=dimensions)
+        embeddings = pca.fit_transform(embeddings)
         np.save(embedding_file, embeddings)
 
     def load(self, index_file, embedding_file):

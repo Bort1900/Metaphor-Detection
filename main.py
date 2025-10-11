@@ -95,3 +95,4 @@ if __name__ == "__main__":
     WordAssociationEmbeddings.create_graph_embeddings(
         swow=swow, index_file="cue_indices.tsv", embedding_file="graph_embeddings.npy"
     )
+    
