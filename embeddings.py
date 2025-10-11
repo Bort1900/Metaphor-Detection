@@ -3,7 +3,19 @@ from sklearn.decomposition import PCA
 import numpy as np
 
 
-class FasttextModel:
+class Embeddings:
+    def __init__(self):
+        pass
+
+    def get_mean_vector(self, tokens):
+        embeddings = [self.get_input_vector(token) for token in tokens]
+        return np.mean(embeddings, axis=0)
+
+    def get_input_vector(self, token):
+        return token
+
+
+class FasttextModel(Embeddings):
     def __init__(self, load_file):
         self.model = fasttext.load_model(load_file)
         self.load_file = load_file
@@ -15,12 +27,8 @@ class FasttextModel:
     def get_output_vector(self, token):
         word_id = self.model.get_word_id(token)
         if word_id == -1:
-            raise ValueError("Word not in dictionary")
+            raise KeyError("Word not in dictionary")
         return self.output_matrix[word_id]
-
-    def get_mean_vector(self, tokens):
-        embeddings = [self.get_input_vector(token) for token in tokens]
-        return np.mean(embeddings, axis=0)
 
     # def train(self, min_count=1):
     #     model = fasttext.train_unsupervised(input=self.data_file, model=self.model_type, min_count=min_count)
@@ -36,7 +44,7 @@ class FasttextModel:
     #     return model
 
 
-class WordAssociationEmbeddings:
+class WordAssociationEmbeddings(Embeddings):
     def __init__(self, swow, index_file, embedding_file):
         self.swow = swow
         self.load(index_file, embedding_file)
