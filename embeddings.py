@@ -40,6 +40,7 @@ class WordAssociationEmbeddings:
     def __init__(self, swow, index_file, embedding_file):
         self.swow = swow
         self.load(index_file, embedding_file)
+        self.mean_vector = np.mean(self.embeddings, axis=0)
 
     @staticmethod
     def create_graph_embeddings(
@@ -64,3 +65,10 @@ class WordAssociationEmbeddings:
             for i, line in enumerate(input):
                 self.indices[line.strip()] = i
         self.embeddings = np.load(embedding_file)
+
+    def get_input_vector(self, token):
+        try:
+            token_index = self.indices[token]
+        except KeyError:
+            return self.mean_vector
+        return self.embeddings[token_index]
