@@ -126,7 +126,7 @@ class MaoModel:
             if self.use_output:
                 try:
                     candidate_vector = self.embeddings.get_output_vector(candidate)
-                except ValueError:
+                except KeyError:
                     # print(f"Word {candidate} not in dictionary, ignoring candidate")
                     continue
             else:
