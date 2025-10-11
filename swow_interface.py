@@ -1,0 +1,52 @@
+import pandas as pd
+import os
+import numpy as np
+import time
+from tqdm import tqdm
+
+
+class SWOWInterface:
+    def __init__(self):
+        self.work_dir = "/projekte/semrel/WORK-AREA/Users/navid/SWOW-EN18"
+        self.association_table, self.association_strength_table = self.init_tables()
+
+    def init_tables(self):
+        associations = pd.read_csv(
+            os.path.join(self.work_dir, "SWOW-EN.complete.20180827.csv"),
+            usecols=["id", "cue", "R1Raw", "R2Raw", "R3Raw", "R1", "R2", "R3"],
+        )
+        strengths = pd.read_csv(
+            os.path.join(self.work_dir, "strength.SWOW-EN.R123.20180827.csv"),
+            delimiter="\t",
+        )
+        return associations, strengths
+
+    def get_all_associations(self, cue):
+        cue_table = self.association_table[self.association_table["cue"] == cue][
+            ["R1", "R2", "R3"]
+        ]
+        associations = []
+        for col in cue_table.columns:
+            associations += [assoc for assoc in cue_table[col]]
+        return set(associations)
+
+    def get_association_strength_matrix(self, use_only_cues=True):
+        cues = self.association_strength_table["cue"].unique()
+        num_cues = len(cues)
+        cue_indices = {cue: i for i, cue in enumerate(cues)}
+        if use_only_cues:
+            valid = self.association_strength_table[
+                self.association_strength_table["response"].isin(cues)
+            ]
+        else:
+            responses = self.association_strength_table["response"].unique()
+            for response in responses:
+                if response not in cue_indices:
+                    cue_indices[response] = num_cues
+                    num_cues += 1
+            valid = self.association_strength_table
+        association_matrix = np.zeros([len(cue_indices), len(cue_indices)])
+        row_indices = valid["cue"].map(cue_indices)
+        col_indices = valid["response"].map(cue_indices)
+        association_matrix[row_indices, col_indices] = valid["R123.Strength"]
+        return association_matrix, cue_indices
