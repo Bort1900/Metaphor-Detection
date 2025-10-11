@@ -2,4 +2,6 @@
 *.txt
 *.bz2
 *.bin
+*.csv
+*.npy
 __pycache__
