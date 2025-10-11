@@ -1,9 +1,10 @@
 from data import DataSet, Sentence
-from embeddings import FasttextModel
+from embeddings import FasttextModel, WordAssociationEmbeddings
 import pandas as pd
 from model import MaoModel
 import re
 from wordnet_interface import WordNetInterface
+from swow_interface import SWOWInterface
 
 
 def urban_extractor(filepath):
@@ -65,28 +66,32 @@ def mohammad_extractor(filepath):
 
 
 if __name__ == "__main__":
+    swow = SWOWInterface()
     wn = WordNetInterface()
     urban_dataset = "/projekte/semrel/Annotations/Figurative-Language/multilingual_EN_DE_SI_lit-fig_v-obj_abstract-concrete/English/example_sentences_verb-object.tsv"
     fasttext_dir = "/projekte/semrel/WORK-AREA/Users/navid/wiki.en.bin"
     mohammad_dataset = "/projekte/semrel/WORK-AREA/Users/navid/Metaphor-Emotion-Data-Files/Data-metaphoric-or-literal.txt"
     embeddings = FasttextModel(fasttext_dir)
-    data = DataSet(mohammad_dataset, mohammad_extractor)
-    train_data, dev_data, test_data = data.get_splits([0, 0.05, 0.95])
-    in_out_model = MaoModel(
-        dev_data=dev_data,
-        test_data=test_data,
-        wn=wn,
-        embeddings=embeddings,
-        use_output_vec=True,
+    # data = DataSet(mohammad_dataset, mohammad_extractor)
+    # train_data, dev_data, test_data = data.get_splits([0, 0.05, 0.95])
+    # in_out_model = MaoModel(
+    #     dev_data=dev_data,
+    #     test_data=test_data,
+    #     wn=wn,
+    #     embeddings=embeddings,
+    #     use_output_vec=True,
+    # )
+    # in_in_model = MaoModel(
+    #     dev_data=dev_data,
+    #     test_data=test_data,
+    #     wn=wn,
+    #     embeddings=embeddings,
+    #     use_output_vec=False,
+    # )
+    # in_in_model.find_best_threshold(steps=0.05)
+    # print(in_in_model.evaluate(in_in_model.test_data))
+    # in_out_model.find_best_threshold(steps=0.05)
+    # print(in_out_model.evaluate(in_out_model.test_data))
+    WordAssociationEmbeddings.create_graph_embeddings(
+        swow=swow, index_file="cue_indices.tsv", embedding_file="graph_embeddings.npy"
     )
-    in_in_model = MaoModel(
-        dev_data=dev_data,
-        test_data=test_data,
-        wn=wn,
-        embeddings=embeddings,
-        use_output_vec=False,
-    )
-    in_in_model.find_best_threshold(steps=0.05)
-    print(in_in_model.evaluate(in_in_model.test_data))
-    in_out_model.find_best_threshold(steps=0.05)
-    print(in_out_model.evaluate(in_out_model.test_data))
