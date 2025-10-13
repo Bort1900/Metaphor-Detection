@@ -4,4 +4,5 @@
 *.bin
 *.csv
 *.npy
+*.tsv
 __pycache__
