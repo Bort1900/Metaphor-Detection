@@ -49,6 +49,7 @@ class MaoModel:
                 # 4 alternations between raising and lowering threshold
                 if abs(alternating_counter) >= 4:
                     increment /= 2
+                    alternating_counter = 0
                 print(alternating_counter)
 
     def optimize_threshold(self, max_epochs=100):
