@@ -21,7 +21,7 @@ class SWOWInterface:
         )
         return associations, strengths
 
-    def get_all_associations(self, cue):
+    def get_candidate_set(self, cue):
         cue_table = self.association_table[self.association_table["cue"] == cue][
             ["R1", "R2", "R3"]
         ]
