@@ -8,11 +8,18 @@ import math
 
 class MaoModel:
     def __init__(
-        self, dev_data, test_data, candidate_source, embeddings, use_output_vec
+        self,
+        dev_data,
+        test_data,
+        candidate_source,
+        candidates_by_pos,
+        embeddings,
+        use_output_vec,
     ):
         self.dev_data = dev_data
         self.test_data = test_data
         self.candidate_source = candidate_source
+        self.use_pos = candidates_by_pos
         self.use_output = use_output_vec
         self.embeddings = embeddings
         self.decision_threshold = 0.6
@@ -121,7 +128,12 @@ class MaoModel:
         return similarity < self.decision_threshold
 
     def best_fit(self, sentence):
-        candidate_set = self.candidate_source.get_candidate_set(sentence.target, "V")
+        if self.use_pos:
+            candidate_set = self.candidate_source.get_candidate_set(
+                sentence.target, self.use_pos
+            )
+        else:
+            candidate_set = self.candidate_source.get_candidate_set(sentence.target)
         candidate_set.add(sentence.target_token)
         best_similarity = -1
         context_vector = self.embeddings.get_mean_vector(sentence.context)
