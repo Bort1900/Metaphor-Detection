@@ -3,6 +3,7 @@ import os
 import numpy as np
 import time
 from tqdm import tqdm
+import re
 
 
 class SWOWInterface:
@@ -15,9 +16,15 @@ class SWOWInterface:
             os.path.join(self.work_dir, "SWOW-EN.complete.20180827.csv"),
             usecols=["id", "cue", "R1Raw", "R2Raw", "R3Raw", "R1", "R2", "R3"],
         )
+        associations[["cue", "R1", "R2", "R3"]] = associations[
+            ["cue", "R1", "R2", "R3"]
+        ].replace(to_replace=re.compile(f"\\s"), value="_")
         strengths = pd.read_csv(
             os.path.join(self.work_dir, "strength.SWOW-EN.R123.20180827.csv"),
             delimiter="\t",
+        )
+        strengths[["cue", "response"]] = associations[["cue", "response"]].replace(
+            to_replace=re.compile(f"\\s"), value="_"
         )
         return associations, strengths
 
