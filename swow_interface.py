@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 import numpy as np
+from nltk.corpus import stopwords
 import time
 from tqdm import tqdm
 import re
@@ -10,6 +11,7 @@ class SWOWInterface:
     def __init__(self):
         self.work_dir = "/projekte/semrel/WORK-AREA/Users/navid/SWOW-EN18"
         self.association_table, self.association_strength_table = self.init_tables()
+        self.stops = stopwords.words("english")
 
     def init_tables(self):
         associations = pd.read_csv(
@@ -35,7 +37,7 @@ class SWOWInterface:
         associations = []
         for col in cue_table.columns:
             associations += [assoc for assoc in cue_table[col]]
-        return set(associations)
+        return set(associations).difference(self.stops)
 
     def get_association_strength_matrix(self, use_only_cues=True):
         cues = self.association_strength_table["cue"].unique()
