@@ -102,9 +102,15 @@ class MaoModel:
 
     def evaluate(self, data):
         confusion_matrix = np.zeros([2, 2])
-        for sentence in tqdm(data):
-            prediction = self.predict(sentence)
-            confusion_matrix[int(prediction), sentence.value] += 1
+        fp_indices = []
+        fn_indices = []
+        for i, sentence in tqdm(enumerate(data)):
+            prediction = int(self.predict(sentence))
+            if prediction > sentence.value:
+                fp_indices.append(i)
+            elif prediction < sentence.value:
+                fn_indices.append(i)
+            confusion_matrix[prediction, sentence.value] += 1
         if confusion_matrix.sum(1)[1] == 0:
             precision = 1
         else:
@@ -118,7 +124,7 @@ class MaoModel:
         else:
             f_score = 2 * precision * recall / (precision + recall)
         print(confusion_matrix)
-        return precision, recall, f_score
+        return precision, recall, f_score, fp_indices, fn_indices
 
     def predict(self, sentence):
         predicted_sense = self.best_fit(sentence)
