@@ -25,7 +25,7 @@ class SWOWInterface:
             os.path.join(self.work_dir, "strength.SWOW-EN.R123.20180827.csv"),
             delimiter="\t",
         )
-        strengths[["cue", "response"]] = associations[["cue", "response"]].replace(
+        strengths[["cue", "response"]] = strengths[["cue", "response"]].replace(
             to_replace=re.compile(f"\\s"), value="_"
         )
         return associations, strengths

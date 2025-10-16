@@ -44,7 +44,7 @@ class MaoModel:
             for _ in range(batch_number):
                 precision, recall, f_score = self.evaluate(
                     self.dev_data[batch_start : batch_start + batch_size]
-                )
+                )[:3]
                 print(
                     f"Current_threshold: {self.decision_threshold}\nBatch F-score: {f_score}"
                 )
@@ -104,7 +104,7 @@ class MaoModel:
         confusion_matrix = np.zeros([2, 2])
         fp_indices = []
         fn_indices = []
-        for i, sentence in tqdm(enumerate(data)):
+        for i, sentence in enumerate(tqdm(data)):
             prediction = int(self.predict(sentence))
             if prediction > sentence.value:
                 fp_indices.append(i)
