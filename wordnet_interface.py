@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 from nltk.corpus import stopwords
+from nltk.corpus import wordnet as wn
 
 
 class WordNetInterface:
@@ -9,7 +10,8 @@ class WordNetInterface:
         self.token_to_synset_ids, self.synset_id_to_token, self.hypernym_synsets = (
             self.init_index_tables()
         )
-        self.stops=stopwords.words("english")
+        self.stops = stopwords.words("english")
+
     def init_index_tables(self):
         # token to synset tables
         nouns = pd.read_csv(
@@ -96,20 +98,26 @@ class WordNetInterface:
         ].iloc[0]["tokens"]
 
     def get_synonyms(self, token, pos):
-        output = set()
-        for id in self.get_synset_ids(token, pos):
-            output.update(set(self.get_tokens_from_id(id, pos)))
-        return output
+        synonyms=set()
+        synsets=[synset for synset in wn.synsets(token) if synset.pos()==pos]
+        for synset in synsets:
+            lemmas = synset.lemma_names()
+            if len(lemmas)==1 or lemmas[0] != token:
+                synonyms.add(lemmas[0])
+            else:
+                synonyms.add(lemmas[1])
+        return synonyms
 
     def get_hypernyms(self, token, pos):
-        return (
-            self.hypernym_synsets[
-                (self.hypernym_synsets["hyponym"] == token)
-                & (self.hypernym_synsets["POS"] == pos)
-            ]["hypernyms"]
-            .explode()
-            .tolist()
-        )
+        hypernyms=set()
+        synsets=[synset.hypernyms()[0] for synset in wn.synsets(token) if synset.hypernyms() and synset.pos()==pos]
+        for synset in synsets:
+            lemmas = synset.lemma_names()
+            if len(lemmas)==1 or lemmas[0] != token:
+                hypernyms.add(lemmas[0])
+            else:
+                hypernyms.add(lemmas[1])
+        return hypernyms
 
     def get_candidate_set(self, token, pos):
         candidates = set()
