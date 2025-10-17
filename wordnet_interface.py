@@ -6,10 +6,10 @@ from nltk.corpus import wordnet as wn
 
 class WordNetInterface:
     def __init__(self):
-        self.work_dir = "/resources/data/WordNet/WordNet-3.0_extract"
-        self.token_to_synset_ids, self.synset_id_to_token, self.hypernym_synsets = (
-            self.init_index_tables()
-        )
+        # self.work_dir = "/resources/data/WordNet/WordNet-3.0_extract"
+        # self.token_to_synset_ids, self.synset_id_to_token, self.hypernym_synsets = (
+        #    self.init_index_tables()
+        # )
         self.stops = stopwords.words("english")
 
     def init_index_tables(self):
@@ -98,22 +98,28 @@ class WordNetInterface:
         ].iloc[0]["tokens"]
 
     def get_synonyms(self, token, pos):
-        synonyms=set()
-        synsets=[synset for synset in wn.synsets(token) if synset.pos()==pos]
+        synonyms = set()
+        synsets = [
+            synset for synset in wn.synsets(token) if synset.pos() == pos or not pos
+        ]
         for synset in synsets:
             lemmas = synset.lemma_names()
-            if len(lemmas)==1 or lemmas[0] != token:
+            if len(lemmas) == 1 or lemmas[0] != token:
                 synonyms.add(lemmas[0])
             else:
                 synonyms.add(lemmas[1])
         return synonyms
 
     def get_hypernyms(self, token, pos):
-        hypernyms=set()
-        synsets=[synset.hypernyms()[0] for synset in wn.synsets(token) if synset.hypernyms() and synset.pos()==pos]
+        hypernyms = set()
+        synsets = [
+            synset.hypernyms()[0]
+            for synset in wn.synsets(token)
+            if synset.hypernyms() and (synset.pos() == pos or not pos)
+        ]
         for synset in synsets:
             lemmas = synset.lemma_names()
-            if len(lemmas)==1 or lemmas[0] != token:
+            if len(lemmas) == 1 or lemmas[0] != token:
                 hypernyms.add(lemmas[0])
             else:
                 hypernyms.add(lemmas[1])
