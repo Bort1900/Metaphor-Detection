@@ -1,17 +1,25 @@
 import fasttext
 from sklearn.decomposition import PCA
 import numpy as np
+from wordnet_interface import WordNetInterface
+from nltk.corpus import wordnet as wn
 
 
 class Embeddings:
     def __init__(self):
         pass
 
-    def get_mean_vector(self, tokens):
-        embeddings = [self.get_input_vector(token) for token in tokens]
+    def get_mean_vector(self, tokens, use_input_vecs=True):
+        if use_input_vecs:
+            embeddings = [self.get_output_vector(token) for token in tokens]
+        else:
+            embeddings = [self.get_input_vector(token) for token in tokens]
         return np.mean(embeddings, axis=0)
 
     def get_input_vector(self, token):
+        return token
+
+    def get_output_vector(self, token):
         return token
 
 
@@ -20,6 +28,7 @@ class FasttextModel(Embeddings):
         self.model = fasttext.load_model(load_file)
         self.load_file = load_file
         self.output_matrix = self.model.get_output_matrix()
+        self.wn_interface = WordNetInterface()
 
     def get_input_vector(self, token):
         return self.model.get_word_vector(token)
@@ -27,7 +36,16 @@ class FasttextModel(Embeddings):
     def get_output_vector(self, token):
         word_id = self.model.get_word_id(token)
         if word_id == -1:
-            raise KeyError("Word not in dictionary")
+            spare_candidates = [
+                candidate
+                for candidate in self.wn_interface.get_candidate_set(
+                    token=token, pos=""
+                )
+                if self.model.get_word_id(candidate) >= 0
+            ]
+            if len(spare_candidates) == 0:
+                raise ValueError("Could not create output vector for unseen word")
+            return self.get_mean_vector(tokens=spare_candidates, use_input_vecs=False)
         return self.output_matrix[word_id]
 
     # def train(self, min_count=1):
@@ -56,15 +74,16 @@ class WordAssociationEmbeddings(Embeddings):
         index_file,
         embedding_file,
         alpha=0.75,
-        dimensions=300,
+        dimensions=-1,
     ):
         matrix, indices = swow.get_association_strength_matrix(use_only_cues=True)
         with open(index_file, "w", encoding="utf-8") as output:
             for key in indices:
                 output.write(str(key) + "\n")
         embeddings = np.linalg.inv(np.identity(len(indices)) - matrix * alpha)
-        pca = PCA(n_components=dimensions)
-        embeddings = pca.fit_transform(embeddings)
+        if dimensions > 0:
+            pca = PCA(n_components=dimensions)
+            embeddings = pca.fit_transform(embeddings)
         np.save(embedding_file, embeddings)
 
     def load(self, index_file, embedding_file):
