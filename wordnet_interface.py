@@ -97,7 +97,7 @@ class WordNetInterface:
             & (self.synset_id_to_token["POS"] == pos)
         ].iloc[0]["tokens"]
 
-    def get_synonyms(self, token, pos):
+    def get_synonyms(self, token, pos=""):
         synonyms = set()
         synsets = [
             synset for synset in wn.synsets(token) if synset.pos() == pos or not pos
@@ -110,7 +110,7 @@ class WordNetInterface:
                 synonyms.add(lemmas[1])
         return synonyms
 
-    def get_hypernyms(self, token, pos):
+    def get_hypernyms(self, token, pos=""):
         hypernyms = set()
         synsets = [
             synset.hypernyms()[0]
@@ -125,7 +125,7 @@ class WordNetInterface:
                 hypernyms.add(lemmas[1])
         return hypernyms
 
-    def get_candidate_set(self, token, pos):
+    def get_candidate_set(self, token, pos=""):
         candidates = set()
         candidates.update(self.get_synonyms(token, pos))
         candidates.update(set(self.get_hypernyms(token, pos)))
