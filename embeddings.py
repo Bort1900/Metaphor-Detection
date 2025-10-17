@@ -11,9 +11,9 @@ class Embeddings:
 
     def get_mean_vector(self, tokens, use_input_vecs=True):
         if use_input_vecs:
-            embeddings = [self.get_output_vector(token) for token in tokens]
-        else:
             embeddings = [self.get_input_vector(token) for token in tokens]
+        else:
+            embeddings = [self.get_output_vector(token) for token in tokens]
         return np.mean(embeddings, axis=0)
 
     def get_input_vector(self, token):
@@ -44,7 +44,9 @@ class FasttextModel(Embeddings):
                 if self.model.get_word_id(candidate) >= 0
             ]
             if len(spare_candidates) == 0:
-                raise ValueError("Could not create output vector for unseen word")
+                raise ValueError(
+                    f"Could not create output vector for unseen word{token}"
+                )
             return self.get_mean_vector(tokens=spare_candidates, use_input_vecs=False)
         return self.output_matrix[word_id]
 
