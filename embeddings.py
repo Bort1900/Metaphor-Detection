@@ -96,8 +96,21 @@ class WordAssociationEmbeddings(Embeddings):
         self.embeddings = np.load(embedding_file)
 
     def get_input_vector(self, token):
-        try:
+        if token in self.indices:
             token_index = self.indices[token]
-        except KeyError:
-            return self.mean_vector
-        return self.embeddings[token_index]
+            return self.embeddings[token_index]
+        else:
+            neighbouring_nodes = self.swow.get_weighted_neighbours(token)
+            if len(neighbouring_nodes) == 0:
+                raise KeyError(f"{token} is not in word association graph")
+            total = sum([weight for weight in neighbouring_nodes.values()])
+            map_factor = 1 / total
+            weighted_mean = np.zeros(self.mean_vector.shape)
+            for neighbour in neighbouring_nodes:
+                neighbour_index = self.indices[neighbour]
+                weighted_mean += (
+                    neighbouring_nodes[neighbour]
+                    * self.embeddings[neighbour_index]
+                    * map_factor
+                )
+            return weighted_mean

@@ -39,6 +39,55 @@ class SWOWInterface:
             associations += [assoc for assoc in cue_table[col]]
         return set(associations).difference(self.stops)
 
+    def get_neighbour_nodes(self, token):
+        output = set()
+        output.update(
+            [
+                cue
+                for cue in self.association_strength_table[
+                    self.association_strength_table["response"] == token
+                ]["cue"]
+            ]
+        )
+        output.update(
+            [
+                response
+                for response in self.association_strength_table[
+                    self.association_strength_table["cue"] == token
+                ]["response"]
+            ]
+        )
+        return output
+
+    def get_weighted_neighbours(self, token):
+        output = dict()
+        responses = self.association_strength_table[
+            self.association_strength_table["cue"] == token
+        ]
+        for i in range(len(responses)):
+            line = responses.iloc[i]
+            output[line["response"]] = line["R123.Strength"]
+        cues = self.association_strength_table[
+            self.association_strength_table["response"] == token
+        ]
+        for i in range(len(cues)):
+            line = cues.iloc[i]
+            if line["cue"] in output:
+                output[line["cue"]] += line["R123.Strength"]
+            else:
+                output[line["cue"]] = line["R123.Strength"]
+        return output
+
+    def get_association_strength(self, cue, response):
+        value = list(
+            self.association_strength_table[
+                self.association_strength_table["cue"] == cue
+            ][self.association_strength_table["response"] == response]["R123.Strength"]
+        )
+        if len(value) == 0:
+            return 0
+        return value[0]
+
     def get_association_strength_matrix(self, use_only_cues=True):
         cues = self.association_strength_table["cue"].unique()
         num_cues = len(cues)
