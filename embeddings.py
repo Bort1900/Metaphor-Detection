@@ -3,6 +3,7 @@ from sklearn.decomposition import PCA
 import numpy as np
 from wordnet_interface import WordNetInterface
 from nltk.corpus import wordnet as wn
+import time
 
 
 class Embeddings:
@@ -11,7 +12,12 @@ class Embeddings:
 
     def get_mean_vector(self, tokens, use_input_vecs=True):
         if use_input_vecs:
-            embeddings = [self.get_input_vector(token) for token in tokens]
+            embeddings = []
+            for token in tokens:
+                try:
+                    embeddings.append(self.get_input_vector(token))
+                except KeyError:
+                    continue
         else:
             embeddings = [self.get_output_vector(token) for token in tokens]
         return np.mean(embeddings, axis=0)

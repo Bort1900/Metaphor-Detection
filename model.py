@@ -104,8 +104,14 @@ class MaoModel:
         confusion_matrix = np.zeros([2, 2])
         fp_indices = []
         fn_indices = []
+        ignore_count = 0
         for i, sentence in enumerate(tqdm(data)):
-            prediction = int(self.predict(sentence))
+            try:
+                prediction = int(self.predict(sentence))
+            except ValueError:
+                print(f"{sentence.target} not in dictionary, ignoring sentence")
+                ignore_count += 1
+                continue
             if prediction > sentence.value:
                 fp_indices.append(i)
             elif prediction < sentence.value:
@@ -124,11 +130,15 @@ class MaoModel:
         else:
             f_score = 2 * precision * recall / (precision + recall)
         print(confusion_matrix)
+        print(f"ignored {ignore_count} sentences of {len(data)}")
         return precision, recall, f_score, fp_indices, fn_indices
 
     def predict(self, sentence):
         predicted_sense = self.best_fit(sentence)
-        target_vector = self.embeddings.get_input_vector(sentence.target)
+        try:
+            target_vector = self.embeddings.get_input_vector(sentence.target)
+        except KeyError:
+            raise ValueError(f"{sentence.target} not in dictionary")
         predicted_vector = self.embeddings.get_input_vector(predicted_sense)
         similarity = Vectors.cos_sim(target_vector, predicted_vector)
         return similarity < self.decision_threshold
@@ -148,11 +158,15 @@ class MaoModel:
             if self.use_output:
                 try:
                     candidate_vector = self.embeddings.get_output_vector(candidate)
+                except ValueError:
+                    print(f"Word {candidate} not in dictionary, ignoring candidate")
+                    continue
+            else:
+                try:
+                    candidate_vector = self.embeddings.get_input_vector(candidate)
                 except KeyError:
                     # print(f"Word {candidate} not in dictionary, ignoring candidate")
                     continue
-            else:
-                candidate_vector = self.embeddings.get_input_vector(candidate)
             similarity = Vectors.cos_sim(candidate_vector, context_vector)
             if similarity >= best_similarity:
                 best_similarity = similarity

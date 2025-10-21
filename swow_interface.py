@@ -12,6 +12,7 @@ class SWOWInterface:
         self.work_dir = "/projekte/semrel/WORK-AREA/Users/navid/SWOW-EN18"
         self.association_table, self.association_strength_table = self.init_tables()
         self.stops = stopwords.words("english")
+        self.index()
 
     def init_tables(self):
         associations = pd.read_csv(
@@ -23,12 +24,30 @@ class SWOWInterface:
         ].replace(to_replace=re.compile(f"\\s"), value="_")
         strengths = pd.read_csv(
             os.path.join(self.work_dir, "strength.SWOW-EN.R123.20180827.csv"),
+            keep_default_na=False,
             delimiter="\t",
         )
         strengths[["cue", "response"]] = strengths[["cue", "response"]].replace(
             to_replace=re.compile(f"\\s"), value="_"
         )
         return associations, strengths
+
+    def index(self):
+        cue_arr = self.association_strength_table["cue"].to_numpy()
+        response_arr = self.association_strength_table["response"].to_numpy()
+        cues, cue_indices, cue_counts = np.unique(
+            cue_arr, return_index=True, return_counts=True
+        )
+        self.cue_to_index = {
+            cue: (index, index + count)
+            for cue, index, count in zip(cues, cue_indices, cue_counts)
+        }
+        self.response_to_index = dict()
+        for i, response in enumerate(response_arr):
+            if response in self.response_to_index:
+                self.response_to_index[response].append(i)
+            else:
+                self.response_to_index[response] = [i]
 
     def get_candidate_set(self, cue):
         cue_table = self.association_table[self.association_table["cue"] == cue][
@@ -60,23 +79,37 @@ class SWOWInterface:
         return output
 
     def get_weighted_neighbours(self, token):
-        output = dict()
-        responses = self.association_strength_table[
-            self.association_strength_table["cue"] == token
-        ]
-        for i in range(len(responses)):
-            line = responses.iloc[i]
-            output[line["response"]] = line["R123.Strength"]
-        cues = self.association_strength_table[
-            self.association_strength_table["response"] == token
-        ]
-        for i in range(len(cues)):
-            line = cues.iloc[i]
-            if line["cue"] in output:
-                output[line["cue"]] += line["R123.Strength"]
-            else:
-                output[line["cue"]] = line["R123.Strength"]
-        return output
+        df = self.association_strength_table
+        cue_arr = df["cue"].to_numpy()
+        resp_arr = df["response"].to_numpy()
+        strength_arr = df["R123.Strength"].to_numpy()
+        cue_index = (0, 0)
+        response_index = []
+        if token in self.cue_to_index:
+            cue_index = self.cue_to_index[token]
+        if token in self.response_to_index:
+            response_index = self.response_to_index[token]
+        if not cue_index and not response_index:
+            return dict()
+        tokens = np.concatenate(
+            [
+                resp_arr[cue_index[0] : cue_index[1]],
+                cue_arr[response_index],
+            ]
+        )
+        strengths = np.concatenate(
+            [
+                strength_arr[cue_index[0] : cue_index[1]],
+                strength_arr[response_index],
+            ]
+        )
+        try:
+            unique, inverse = np.unique(tokens, return_inverse=True)
+        except TypeError as er:
+            print([token for token in tokens if type(token) != str])
+            raise TypeError(er.message)
+        sums = np.bincount(inverse, weights=strengths)
+        return dict(zip(unique, sums))
 
     def get_association_strength(self, cue, response):
         value = list(
