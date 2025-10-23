@@ -46,7 +46,7 @@ class MaoModel:
                     self.dev_data[batch_start : batch_start + batch_size]
                 )[0]
                 print(
-                    f"Current_threshold: {self.decision_threshold}\nBatch F-score: {scores["micro_f_1"]}"
+                    f"Current_threshold: {self.decision_threshold}\nBatch F-score: {scores["macro_f_1"]}"
                 )
                 batch_start += batch_size
                 if scores["recall"] < scores["precision"]:
@@ -68,14 +68,14 @@ class MaoModel:
         lower_bound = 0
         i = 0
         upper_bound = 1
-        last_f_score = self.evaluate(self.dev_data)[0]["micro_f_1"]
+        last_f_score = self.evaluate(self.dev_data)[0]["macro_f_1"]
         while (
             self.decision_threshold <= upper_bound
             and self.decision_threshold >= lower_bound
             and i < max_epochs
         ):
             self.decision_threshold += direction * increment
-            current_f_score = self.evaluate(self.dev_data)[0]["micro_f_1"]
+            current_f_score = self.evaluate(self.dev_data)[0]["macro_f_1"]
             if current_f_score < last_f_score:
                 if direction == 1:
                     upper_bound = self.decision_threshold
@@ -92,7 +92,7 @@ class MaoModel:
         best_threshold = 0
         best_f_score = 0
         while self.decision_threshold < 1:
-            f_score = self.evaluate(self.dev_data)[0]["micro_f_1"]
+            f_score = self.evaluate(self.dev_data)[0]["macro_f_1"]
             if f_score > best_f_score:
                 best_f_score = f_score
                 best_threshold = self.decision_threshold
@@ -181,12 +181,12 @@ class MaoModel:
         self.decision_threshold = 0
         with open(save_file, "w", encoding="utf-8") as output:
             output.write(
-                "Threshold\tPrecision\tRecall\tF1(Class 1)\tF1(Class 2)\tF1(Micro-Average)\n"
+                "Threshold\tPrecision\tRecall\tF1(Class 1)\tF1(Class 2)\tF1(Macro-Average)\n"
             )
             while self.decision_threshold < 1:
                 scores = self.evaluate(self.test_data)[0]
                 output.write(
-                    f"{round(self.decision_threshold,2)}\t{round(scores["precision"],2)}\t{round(scores["recall"],2)}\t{round(scores["f_1"],2)}\t{round(scores["anti_f_1"],2)}\t{round(scores["micro_f_1"],2)}\n"
+                    f"{round(self.decision_threshold,2)}\t{round(scores["precision"],2)}\t{round(scores["recall"],2)}\t{round(scores["f_1"],2)}\t{round(scores["anti_f_1"],2)}\t{round(scores["macro_f_1"],2)}\n"
                 )
                 self.decision_threshold += steps
 
