@@ -42,17 +42,17 @@ class MaoModel:
             print(f"epoch {i+1}:")
             batch_start = 0
             for _ in range(batch_number):
-                precision, recall, f_score = self.evaluate(
+                scores = self.evaluate(
                     self.dev_data[batch_start : batch_start + batch_size]
-                )[:3]
+                )[0]
                 print(
-                    f"Current_threshold: {self.decision_threshold}\nBatch F-score: {f_score}"
+                    f"Current_threshold: {self.decision_threshold}\nBatch F-score: {scores["micro_f_1"]}"
                 )
                 batch_start += batch_size
-                if recall < precision:
+                if scores["recall"] < scores["precision"]:
                     self.decision_threshold += increment
                     alternating_counter = max(0, alternating_counter * (-1) + 1)
-                elif precision < recall:
+                elif scores["precision"] < scores["recall"]:
                     self.decision_threshold -= increment
                     alternating_counter = min(0, alternating_counter * (-1) - 1)
                 # 4 alternations between raising and lowering threshold
@@ -68,14 +68,14 @@ class MaoModel:
         lower_bound = 0
         i = 0
         upper_bound = 1
-        last_f_score = self.evaluate(self.dev_data)[2]
+        last_f_score = self.evaluate(self.dev_data)[0]["micro_f_1"]
         while (
             self.decision_threshold <= upper_bound
             and self.decision_threshold >= lower_bound
             and i < max_epochs
         ):
             self.decision_threshold += direction * increment
-            current_f_score = self.evaluate(self.dev_data)[2]
+            current_f_score = self.evaluate(self.dev_data)[0]["micro_f_1"]
             if current_f_score < last_f_score:
                 if direction == 1:
                     upper_bound = self.decision_threshold
@@ -92,13 +92,68 @@ class MaoModel:
         best_threshold = 0
         best_f_score = 0
         while self.decision_threshold < 1:
-            f_score = self.evaluate(self.dev_data)[2]
+            f_score = self.evaluate(self.dev_data)[0]["micro_f_1"]
             if f_score > best_f_score:
                 best_f_score = f_score
                 best_threshold = self.decision_threshold
             self.decision_threshold += steps
         self.decision_threshold = best_threshold
         print(f"Best Threshold: {self.decision_threshold}, F-Score: {best_f_score}")
+
+    @staticmethod
+    def calculate_scores(confusion_matrix):
+        scores = dict()
+        if confusion_matrix.sum(1)[0] == 0:
+            scores["anti_precision"] = 1
+        else:
+            scores["anti_precision"] = float(
+                confusion_matrix[0, 0] / confusion_matrix.sum(1)[0]
+            )
+        if confusion_matrix.sum(1)[1] == 0:
+            scores["precision"] = 1
+        else:
+            scores["precision"] = float(
+                confusion_matrix[1, 1] / confusion_matrix.sum(1)[1]
+            )
+        if confusion_matrix.sum(0)[1] == 0:
+            scores["recall"] = 1
+        else:
+            scores["recall"] = float(
+                confusion_matrix[1, 1] / confusion_matrix.sum(0)[1]
+            )
+        if confusion_matrix.sum(0)[0] == 0:
+            scores["anti_recall"] = 1
+        else:
+            scores["anti_recall"] = float(
+                confusion_matrix[0, 0] / confusion_matrix.sum(0)[0]
+            )
+        if scores["precision"] + scores["recall"] == 0:
+            scores["f_1"] = 0
+        else:
+            scores["f_1"] = (
+                2
+                * scores["precision"]
+                * scores["recall"]
+                / (scores["precision"] + scores["recall"])
+            )
+        if scores["anti_precision"] + scores["anti_recall"] == 0:
+            scores["anti_f_1"] = 0
+        else:
+            scores["anti_f_1"] = (
+                2
+                * scores["anti_precision"]
+                * scores["anti_recall"]
+                / (scores["anti_precision"] + scores["anti_recall"])
+            )
+        scores["macro_f_1"] = (scores["f_1"] + scores["anti_f_1"]) / 2
+        scores["micro_f_1"] = float(
+            (
+                scores["f_1"] * confusion_matrix.sum(0)[1]
+                + scores["anti_f_1"] * confusion_matrix.sum(0)[0]
+            )
+            / confusion_matrix.sum()
+        )
+        return scores
 
     def evaluate(self, data):
         confusion_matrix = np.zeros([2, 2])
@@ -117,21 +172,10 @@ class MaoModel:
             elif prediction < sentence.value:
                 fn_indices.append(i)
             confusion_matrix[prediction, sentence.value] += 1
-        if confusion_matrix.sum(1)[1] == 0:
-            precision = 1
-        else:
-            precision = float(confusion_matrix[1, 1] / confusion_matrix.sum(1)[1])
-        if confusion_matrix.sum(0)[1] == 0:
-            recall = 1
-        else:
-            recall = float(confusion_matrix[1, 1] / confusion_matrix.sum(0)[1])
-        if precision + recall == 0:
-            f_score = 0
-        else:
-            f_score = 2 * precision * recall / (precision + recall)
         print(confusion_matrix)
         print(f"ignored {ignore_count} sentences of {len(data)}")
-        return precision, recall, f_score, fp_indices, fn_indices
+        scores = MaoModel.calculate_scores(confusion_matrix=confusion_matrix)
+        return scores, fp_indices, fn_indices
 
     def predict(self, sentence):
         predicted_sense = self.best_fit(sentence)
