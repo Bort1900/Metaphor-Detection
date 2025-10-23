@@ -177,6 +177,19 @@ class MaoModel:
         scores = MaoModel.calculate_scores(confusion_matrix=confusion_matrix)
         return scores, fp_indices, fn_indices
 
+    def evaluate_per_threshold(self, steps, save_file):
+        self.decision_threshold = 0
+        with open(save_file, "w", encoding="utf-8") as output:
+            output.write(
+                "Threshold\tPrecision\tRecall\tF1(Class 1)\tF1(Class 2)\tF1(Micro-Average)\n"
+            )
+            while self.decision_threshold < 1:
+                scores = self.evaluate(self.test_data)[0]
+                output.write(
+                    f"{round(self.decision_threshold,2)}\t{round(scores["precision"],2)}\t{round(scores["recall"],2)}\t{round(scores["f_1"],2)}\t{round(scores["anti_f_1"],2)}\t{round(scores["micro_f_1"],2)}\n"
+                )
+                self.decision_threshold += steps
+
     def predict(self, sentence):
         predicted_sense = self.best_fit(sentence)
         try:
