@@ -5,12 +5,13 @@ from nltk.corpus import wordnet as wn
 
 
 class WordNetInterface:
-    def __init__(self):
+    def __init__(self, use_pos):
         # self.work_dir = "/resources/data/WordNet/WordNet-3.0_extract"
         # self.token_to_synset_ids, self.synset_id_to_token, self.hypernym_synsets = (
         #    self.init_index_tables()
         # )
         self.stops = stopwords.words("english")
+        self.pos = use_pos
 
     def init_index_tables(self):
         # token to synset tables
@@ -97,10 +98,12 @@ class WordNetInterface:
             & (self.synset_id_to_token["POS"] == pos)
         ].iloc[0]["tokens"]
 
-    def get_synonyms(self, token, pos=""):
+    def get_synonyms(self, token):
         synonyms = set()
         synsets = [
-            synset for synset in wn.synsets(token) if synset.pos() == pos or not pos
+            synset
+            for synset in wn.synsets(token)
+            if synset.pos() == self.pos or not self.pos
         ]
         for synset in synsets:
             lemmas = synset.lemma_names()
@@ -110,12 +113,12 @@ class WordNetInterface:
                 synonyms.add(lemmas[1])
         return synonyms
 
-    def get_hypernyms(self, token, pos=""):
+    def get_hypernyms(self, token):
         hypernyms = set()
         synsets = [
             synset.hypernyms()[0]
             for synset in wn.synsets(token)
-            if synset.hypernyms() and (synset.pos() == pos or not pos)
+            if synset.hypernyms() and (synset.pos() == self.pos or not self.pos)
         ]
         for synset in synsets:
             lemmas = synset.lemma_names()
@@ -125,10 +128,10 @@ class WordNetInterface:
                 hypernyms.add(lemmas[1])
         return hypernyms
 
-    def get_candidate_set(self, token, pos=""):
+    def get_candidate_set(self, token):
         candidates = set()
-        candidates.update(self.get_synonyms(token, pos))
-        candidates.update(set(self.get_hypernyms(token, pos)))
+        candidates.update(self.get_synonyms(token))
+        candidates.update(set(self.get_hypernyms(token)))
         candidates.difference_update(self.stops)
         candidates.add(token)
         return candidates
