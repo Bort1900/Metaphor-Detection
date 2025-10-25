@@ -8,10 +8,11 @@ import re
 
 
 class SWOWInterface:
-    def __init__(self):
+    def __init__(self, number_of_responses):
         self.work_dir = "/projekte/semrel/WORK-AREA/Users/navid/SWOW-EN18"
         self.association_table, self.association_strength_table = self.init_tables()
         self.stops = stopwords.words("english")
+        self.num_responses = number_of_responses
         self.index()
 
     def init_tables(self):
@@ -50,8 +51,9 @@ class SWOWInterface:
                 self.response_to_index[response] = [i]
 
     def get_candidate_set(self, cue):
+        relevant_tables = ["R1", "R2", "R3"][: self.num_responses]
         cue_table = self.association_table[self.association_table["cue"] == cue][
-            ["R1", "R2", "R3"]
+            relevant_tables
         ]
         associations = []
         for col in cue_table.columns:
