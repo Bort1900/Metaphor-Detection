@@ -214,13 +214,23 @@ class MaoModel:
         for candidate in candidate_set:
             if self.use_output:
                 try:
-                    candidate_vector = self.embeddings.get_output_vector(candidate)
+                    if len(candidate.split("_")) > 1:
+                        candidate_vector = self.embeddings.get_mean_vector(
+                            tokens=candidate.split("_"), use_input_vecs=False
+                        )
+                    else:
+                        candidate_vector = self.embeddings.get_output_vector(candidate)
                 except ValueError:
                     print(f"Word {candidate} not in dictionary, ignoring candidate")
                     continue
             else:
                 try:
-                    candidate_vector = self.embeddings.get_input_vector(candidate)
+                    if len(candidate.split("_")) > 1:
+                        candidate_vector = self.embeddings.get_mean_vector(
+                            tokens=candidate.split("_"), use_input_vecs=True
+                        )
+                    else:
+                        candidate_vector = self.embeddings.get_input_vector(candidate)
                 except KeyError:
                     # print(f"Word {candidate} not in dictionary, ignoring candidate")
                     continue
