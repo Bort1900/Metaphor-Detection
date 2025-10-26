@@ -34,7 +34,7 @@ class FasttextModel(Embeddings):
         self.model = fasttext.load_model(load_file)
         self.load_file = load_file
         self.output_matrix = self.model.get_output_matrix()
-        self.wn_interface = WordNetInterface()
+        self.wn_interface = WordNetInterface(use_pos="")
 
     def get_input_vector(self, token):
         return self.model.get_word_vector(token)
@@ -44,9 +44,7 @@ class FasttextModel(Embeddings):
         if word_id == -1:
             spare_candidates = [
                 candidate
-                for candidate in self.wn_interface.get_candidate_set(
-                    token=token, pos=""
-                )
+                for candidate in self.wn_interface.get_candidate_set(token=token)
                 if self.model.get_word_id(candidate) >= 0
             ]
             if len(spare_candidates) == 0:
