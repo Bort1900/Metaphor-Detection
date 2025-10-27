@@ -84,7 +84,10 @@ class NThresholdModel:
         return scores
 
     def predict(self, sentence):
-        similarity = self.get_compare_value(sentence)
+        try:
+            similarity = self.get_compare_value(sentence)
+        except ValueError:
+            raise ValueError(f"{sentence.target} not in dictionary")
         scale = self.decision_thresholds + [similarity]
         scale.sort()
         return scale.index(similarity)
@@ -128,6 +131,7 @@ class NThresholdModel:
                     # print(f"Word {candidate} not in dictionary, ignoring candidate")
                     continue
             similarity = Vectors.cos_sim(candidate_vector, context_vector)
+
             if similarity >= best_similarity:
                 best_similarity = similarity
                 best_candidate = candidate
@@ -137,8 +141,12 @@ class NThresholdModel:
         for _ in range(epochs):
             random.shuffle(self.dev_data)
             for sentence in self.dev_data:
-                comp_value = self.get_compare_value(sentence)
-                prediction = self.predict(sentence)
+                try:
+                    comp_value = self.get_compare_value(sentence)
+                    prediction = int(self.predict(sentence))
+                except ValueError:
+                    print(f"{sentence.target} not in dictionary, ignoring sentence")
+                    continue
                 if prediction != sentence.value:
                     for i, threshold in enumerate(self.decision_thresholds):
                         if comp_value > threshold and sentence.value <= i:
