@@ -38,8 +38,8 @@ class Sentence:
 
 class DataSet:
 
-    def __init__(self, filepath, extraction_function):
-        self.sentences = extraction_function(filepath)
+    def __init__(self, filepath, extraction_function, use_unsure):
+        self.sentences = extraction_function(filepath, use_unsure)
 
     def get_splits(self, splits):
         """
