@@ -74,7 +74,7 @@ class NThresholdModel:
             try:
                 prediction = int(self.predict(sentence))
             except ValueError:
-                print(f"{sentence.target} not in dictionary, ignoring sentence")
+                # print(f"{sentence.target} not in dictionary, ignoring sentence")
                 ignore_count += 1
                 continue
             confusion_matrix[prediction, sentence.value] += 1
@@ -117,7 +117,7 @@ class NThresholdModel:
                     else:
                         candidate_vector = self.embeddings.get_output_vector(candidate)
                 except ValueError:
-                    print(f"Word {candidate} not in dictionary, ignoring candidate")
+                    # print(f"Word {candidate} not in dictionary, ignoring candidate")
                     continue
             else:
                 try:
@@ -145,7 +145,7 @@ class NThresholdModel:
                     comp_value = self.get_compare_value(sentence)
                     prediction = int(self.predict(sentence))
                 except ValueError:
-                    print(f"{sentence.target} not in dictionary, ignoring sentence")
+                    # print(f"{sentence.target} not in dictionary, ignoring sentence")
                     continue
                 if prediction != sentence.value:
                     for i, threshold in enumerate(self.decision_thresholds):
@@ -252,14 +252,14 @@ class MaoModel(NThresholdModel):
         print(f"Best Threshold: {self.decision_threshold}, F-Score: {best_f_score}")
 
     def evaluate_per_threshold(self, steps, save_file):
-        self.decision_threshold = 0
+        self.decision_thresholds = [0]
         with open(save_file, "w", encoding="utf-8") as output:
             output.write(
                 "Threshold\tPrecision\tRecall\tF1(Class 1)\tF1(Class 2)\tF1(Macro-Average)\n"
             )
-            while self.decision_threshold < 1:
+            while self.decision_thresholds[0] < 1:
                 scores = self.evaluate(self.test_data)
                 output.write(
-                    f"{round(self.decision_threshold,2)}\t{round(scores["precision_class_0"],2)}\t{round(scores["recall_class_0"],2)}\t{round(scores["f_1_class_0"],2)}\t{round(scores["f_1_class_1"],2)}\t{round(scores["macro_f_1"],2)}\n"
+                    f"{round(self.decision_thresholds[0],2)}\t{round(scores["precision_class_0"],2)}\t{round(scores["recall_class_0"],2)}\t{round(scores["f_1_class_0"],2)}\t{round(scores["f_1_class_1"],2)}\t{round(scores["macro_f_1"],2)}\n"
                 )
-                self.decision_threshold += steps
+                self.decision_thresholds[0] += steps
