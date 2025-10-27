@@ -12,6 +12,7 @@ class NThresholdModel:
         dev_data,
         test_data,
         candidate_source,
+        mean_multi_word,
         embeddings,
         use_output_vec,
         num_classes=2,
@@ -19,6 +20,7 @@ class NThresholdModel:
         self.dev_data = dev_data
         self.test_data = test_data
         self.candidate_source = candidate_source
+        self.mean_multi_word = mean_multi_word
         self.use_output = use_output_vec
         self.embeddings = embeddings
         self.decision_thresholds = [0.5 for i in range(num_classes - 1)]
@@ -105,7 +107,7 @@ class NThresholdModel:
         for candidate in candidate_set:
             if self.use_output:
                 try:
-                    if len(candidate.split("_")) > 1:
+                    if len(candidate.split("_")) > 1 and self.mean_multi_word:
                         candidate_vector = self.embeddings.get_mean_vector(
                             tokens=candidate.split("_"), use_input_vecs=False
                         )
@@ -116,7 +118,7 @@ class NThresholdModel:
                     continue
             else:
                 try:
-                    if len(candidate.split("_")) > 1:
+                    if len(candidate.split("_")) > 1 and self.mean_multi_word:
                         candidate_vector = self.embeddings.get_mean_vector(
                             tokens=candidate.split("_"), use_input_vecs=True
                         )
@@ -148,12 +150,19 @@ class NThresholdModel:
 
 class MaoModel(NThresholdModel):
     def __init__(
-        self, dev_data, test_data, candidate_source, embeddings, use_output_vec
+        self,
+        dev_data,
+        test_data,
+        candidate_source,
+        mean_multi_word,
+        embeddings,
+        use_output_vec,
     ):
         super().__init__(
             dev_data=dev_data,
             test_data=test_data,
             candidate_source=candidate_source,
+            mean_multi_word=mean_multi_word,
             embeddings=embeddings,
             use_output_vec=use_output_vec,
         )
@@ -241,8 +250,8 @@ class MaoModel(NThresholdModel):
                 "Threshold\tPrecision\tRecall\tF1(Class 1)\tF1(Class 2)\tF1(Macro-Average)\n"
             )
             while self.decision_threshold < 1:
-                scores = self.evaluate(self.test_data)[0]
+                scores = self.evaluate(self.test_data)
                 output.write(
-                    f"{round(self.decision_threshold,2)}\t{round(scores["precision"],2)}\t{round(scores["recall"],2)}\t{round(scores["f_1"],2)}\t{round(scores["anti_f_1"],2)}\t{round(scores["macro_f_1"],2)}\n"
+                    f"{round(self.decision_threshold,2)}\t{round(scores["precision_class_0"],2)}\t{round(scores["recall_class_0"],2)}\t{round(scores["f_1_class_0"],2)}\t{round(scores["f_1_class_1"],2)}\t{round(scores["macro_f_1"],2)}\n"
                 )
                 self.decision_threshold += steps
