@@ -10,6 +10,12 @@ import re
 class SWOWInterface:
     def __init__(self, number_of_responses):
         self.work_dir = "/projekte/semrel/WORK-AREA/Users/navid/SWOW-EN18"
+        self.strength_file = (
+            "strength.SWOW-EN.R1.20180827.csv"
+            if number_of_responses < 3
+            else "strength.SWOW-EN.R123.20180827.csv"
+        )
+        self.response_file = "SWOW-EN.complete.20180827.csv"
         self.association_table, self.association_strength_table = self.init_tables()
         self.stops = stopwords.words("english")
         self.num_responses = number_of_responses
@@ -17,15 +23,17 @@ class SWOWInterface:
 
     def init_tables(self):
         associations = pd.read_csv(
-            os.path.join(self.work_dir, "SWOW-EN.complete.20180827.csv"),
+            os.path.join(self.work_dir, self.response_file),
             usecols=["id", "cue", "R1Raw", "R2Raw", "R3Raw", "R1", "R2", "R3"],
         )
         associations[["cue", "R1", "R2", "R3"]] = associations[
             ["cue", "R1", "R2", "R3"]
         ].replace(to_replace=re.compile(f"\\s"), value="_")
         strengths = pd.read_csv(
-            os.path.join(self.work_dir, "strength.SWOW-EN.R123.20180827.csv"),
+            os.path.join(self.work_dir, self.strength_file),
             keep_default_na=False,
+            header=0,
+            names=["cue", "response", "num_response", "num_total", "strength"],
             delimiter="\t",
         )
         strengths[["cue", "response"]] = strengths[["cue", "response"]].replace(
@@ -84,7 +92,7 @@ class SWOWInterface:
         df = self.association_strength_table
         cue_arr = df["cue"].to_numpy()
         resp_arr = df["response"].to_numpy()
-        strength_arr = df["R123.Strength"].to_numpy()
+        strength_arr = df["strength"].to_numpy()
         cue_index = (0, 0)
         response_index = []
         if token in self.cue_to_index:
@@ -117,7 +125,7 @@ class SWOWInterface:
         value = list(
             self.association_strength_table[
                 self.association_strength_table["cue"] == cue
-            ][self.association_strength_table["response"] == response]["R123.Strength"]
+            ][self.association_strength_table["response"] == response]["strength"]
         )
         if len(value) == 0:
             return 0
@@ -141,5 +149,5 @@ class SWOWInterface:
         association_matrix = np.zeros([len(cue_indices), len(cue_indices)])
         row_indices = valid["cue"].map(cue_indices)
         col_indices = valid["response"].map(cue_indices)
-        association_matrix[row_indices, col_indices] = valid["R123.Strength"]
+        association_matrix[row_indices, col_indices] = valid["strength"]
         return association_matrix, cue_indices
