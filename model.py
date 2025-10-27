@@ -6,7 +6,7 @@ from tqdm import tqdm
 import math
 
 
-class MaoModel:
+class NThresholdModel:
     def __init__(
         self,
         dev_data,
@@ -14,13 +14,69 @@ class MaoModel:
         candidate_source,
         embeddings,
         use_output_vec,
+        num_classes=2,
     ):
         self.dev_data = dev_data
         self.test_data = test_data
         self.candidate_source = candidate_source
         self.use_output = use_output_vec
         self.embeddings = embeddings
-        self.decision_threshold = 0.6
+        self.decision_thresholds = [0.5 for i in range(num_classes - 1)]
+        self.num_classes = num_classes
+
+    @staticmethod
+    def calculate_scores(confusion_matrix):
+        num_classes = len(confusion_matrix)
+        scores = dict()
+        for i in range(num_classes):
+            if confusion_matrix.sum(1)[i] == 0:
+                scores[f"precision_class_{i}"] = 1
+            else:
+                scores[f"precision_class_{i}"] = float(
+                    confusion_matrix[i, i] / confusion_matrix.sum(1)[i]
+                )
+            if confusion_matrix.sum(0)[i] == 0:
+                scores[f"recall_class_{i}"] = 1
+            else:
+                scores[f"recall_class_{i}"] = float(
+                    confusion_matrix[i, i] / confusion_matrix.sum(0)[i]
+                )
+            if scores[f"precision_class_{i}"] + scores[f"recall_class_{i}"] == 0:
+                scores[f"f_1_class_{i}"] = 0
+            else:
+                scores[f"f_1_class_{i}"] = (
+                    2
+                    * scores[f"precision_class_{i}"]
+                    * scores[f"recall_class_{i}"]
+                    / (scores[f"precision_class_{i}"] + scores[f"recall_class_{i}"])
+                )
+
+        scores["macro_f_1"] = (
+            sum([scores[f"f_1_class_{i}"] for i in range(num_classes)]) / 2
+        )
+        scores["micro_f_1"] = float(
+            sum(
+                [
+                    scores[f"f_1_class_{i}" * confusion_matrix.sum(0)[i]]
+                    for i in range(num_classes)
+                ]
+            )
+            / confusion_matrix.sum()
+        )
+        return scores
+
+
+class MaoModel(NThresholdModel):
+    def __init__(
+        self, dev_data, test_data, candidate_source, embeddings, use_output_vec
+    ):
+        super().__init__(
+            dev_data=dev_data,
+            test_data=test_data,
+            candidate_source=candidate_source,
+            embeddings=embeddings,
+            use_output_vec=use_output_vec,
+        )
 
     def train_threshold(self, increment, epochs, batch_size=-1):
         """
@@ -97,61 +153,6 @@ class MaoModel:
             self.decision_threshold += steps
         self.decision_threshold = best_threshold
         print(f"Best Threshold: {self.decision_threshold}, F-Score: {best_f_score}")
-
-    @staticmethod
-    def calculate_scores(confusion_matrix):
-        scores = dict()
-        if confusion_matrix.sum(1)[0] == 0:
-            scores["anti_precision"] = 1
-        else:
-            scores["anti_precision"] = float(
-                confusion_matrix[0, 0] / confusion_matrix.sum(1)[0]
-            )
-        if confusion_matrix.sum(1)[1] == 0:
-            scores["precision"] = 1
-        else:
-            scores["precision"] = float(
-                confusion_matrix[1, 1] / confusion_matrix.sum(1)[1]
-            )
-        if confusion_matrix.sum(0)[1] == 0:
-            scores["recall"] = 1
-        else:
-            scores["recall"] = float(
-                confusion_matrix[1, 1] / confusion_matrix.sum(0)[1]
-            )
-        if confusion_matrix.sum(0)[0] == 0:
-            scores["anti_recall"] = 1
-        else:
-            scores["anti_recall"] = float(
-                confusion_matrix[0, 0] / confusion_matrix.sum(0)[0]
-            )
-        if scores["precision"] + scores["recall"] == 0:
-            scores["f_1"] = 0
-        else:
-            scores["f_1"] = (
-                2
-                * scores["precision"]
-                * scores["recall"]
-                / (scores["precision"] + scores["recall"])
-            )
-        if scores["anti_precision"] + scores["anti_recall"] == 0:
-            scores["anti_f_1"] = 0
-        else:
-            scores["anti_f_1"] = (
-                2
-                * scores["anti_precision"]
-                * scores["anti_recall"]
-                / (scores["anti_precision"] + scores["anti_recall"])
-            )
-        scores["macro_f_1"] = (scores["f_1"] + scores["anti_f_1"]) / 2
-        scores["micro_f_1"] = float(
-            (
-                scores["f_1"] * confusion_matrix.sum(0)[1]
-                + scores["anti_f_1"] * confusion_matrix.sum(0)[0]
-            )
-            / confusion_matrix.sum()
-        )
-        return scores
 
     def evaluate(self, data):
         confusion_matrix = np.zeros([2, 2])
