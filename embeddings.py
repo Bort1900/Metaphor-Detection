@@ -111,10 +111,11 @@ class WordAssociationEmbeddings(Embeddings):
             map_factor = 1 / total
             weighted_mean = np.zeros(self.mean_vector.shape)
             for neighbour in neighbouring_nodes:
-                neighbour_index = self.indices[neighbour]
-                weighted_mean += (
-                    neighbouring_nodes[neighbour]
-                    * self.embeddings[neighbour_index]
-                    * map_factor
-                )
+                if neighbour in self.indices:
+                    neighbour_index = self.indices[neighbour]
+                    weighted_mean += (
+                        neighbouring_nodes[neighbour]
+                        * self.embeddings[neighbour_index]
+                        * map_factor
+                    )
             return weighted_mean
