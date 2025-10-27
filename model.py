@@ -57,13 +57,76 @@ class NThresholdModel:
         scores["micro_f_1"] = float(
             sum(
                 [
-                    scores[f"f_1_class_{i}" * confusion_matrix.sum(0)[i]]
+                    scores[f"f_1_class_{i}"] * confusion_matrix.sum(0)[i]
                     for i in range(num_classes)
                 ]
             )
             / confusion_matrix.sum()
         )
         return scores
+
+    def evaluate(self, data):
+        confusion_matrix = np.zeros([self.num_classes, self.num_classes])
+        ignore_count = 0
+        for sentence in tqdm(data):
+            try:
+                prediction = int(self.predict(sentence))
+            except ValueError:
+                print(f"{sentence.target} not in dictionary, ignoring sentence")
+                ignore_count += 1
+                continue
+            confusion_matrix[prediction, sentence.value] += 1
+        print(confusion_matrix)
+        print(f"ignored {ignore_count} sentences of {len(data)}")
+        scores = NThresholdModel.calculate_scores(confusion_matrix=confusion_matrix)
+        return scores
+
+    def predict(self, sentence):
+        predicted_sense = self.best_fit(sentence)
+        try:
+            target_vector = self.embeddings.get_input_vector(sentence.target)
+        except KeyError:
+            raise ValueError(f"{sentence.target} not in dictionary")
+        predicted_vector = self.embeddings.get_input_vector(predicted_sense)
+        similarity = Vectors.cos_sim(target_vector, predicted_vector)
+        scale = self.decision_thresholds + [similarity]
+        scale.sort()
+        return scale.index(similarity)
+
+    def best_fit(self, sentence):
+        candidate_set = self.candidate_source.get_candidate_set(sentence.target)
+        candidate_set.add(sentence.target_token)
+        best_similarity = -1
+        context_vector = self.embeddings.get_mean_vector(sentence.context)
+        best_candidate = sentence.target
+        for candidate in candidate_set:
+            if self.use_output:
+                try:
+                    if len(candidate.split("_")) > 1:
+                        candidate_vector = self.embeddings.get_mean_vector(
+                            tokens=candidate.split("_"), use_input_vecs=False
+                        )
+                    else:
+                        candidate_vector = self.embeddings.get_output_vector(candidate)
+                except ValueError:
+                    print(f"Word {candidate} not in dictionary, ignoring candidate")
+                    continue
+            else:
+                try:
+                    if len(candidate.split("_")) > 1:
+                        candidate_vector = self.embeddings.get_mean_vector(
+                            tokens=candidate.split("_"), use_input_vecs=True
+                        )
+                    else:
+                        candidate_vector = self.embeddings.get_input_vector(candidate)
+                except KeyError:
+                    # print(f"Word {candidate} not in dictionary, ignoring candidate")
+                    continue
+            similarity = Vectors.cos_sim(candidate_vector, context_vector)
+            if similarity >= best_similarity:
+                best_similarity = similarity
+                best_candidate = candidate
+        return best_candidate
 
 
 class MaoModel(NThresholdModel):
@@ -154,28 +217,6 @@ class MaoModel(NThresholdModel):
         self.decision_threshold = best_threshold
         print(f"Best Threshold: {self.decision_threshold}, F-Score: {best_f_score}")
 
-    def evaluate(self, data):
-        confusion_matrix = np.zeros([2, 2])
-        fp_indices = []
-        fn_indices = []
-        ignore_count = 0
-        for i, sentence in enumerate(tqdm(data)):
-            try:
-                prediction = int(self.predict(sentence))
-            except ValueError:
-                print(f"{sentence.target} not in dictionary, ignoring sentence")
-                ignore_count += 1
-                continue
-            if prediction > sentence.value:
-                fp_indices.append(i)
-            elif prediction < sentence.value:
-                fn_indices.append(i)
-            confusion_matrix[prediction, sentence.value] += 1
-        print(confusion_matrix)
-        print(f"ignored {ignore_count} sentences of {len(data)}")
-        scores = MaoModel.calculate_scores(confusion_matrix=confusion_matrix)
-        return scores, fp_indices, fn_indices
-
     def evaluate_per_threshold(self, steps, save_file):
         self.decision_threshold = 0
         with open(save_file, "w", encoding="utf-8") as output:
@@ -188,48 +229,3 @@ class MaoModel(NThresholdModel):
                     f"{round(self.decision_threshold,2)}\t{round(scores["precision"],2)}\t{round(scores["recall"],2)}\t{round(scores["f_1"],2)}\t{round(scores["anti_f_1"],2)}\t{round(scores["macro_f_1"],2)}\n"
                 )
                 self.decision_threshold += steps
-
-    def predict(self, sentence):
-        predicted_sense = self.best_fit(sentence)
-        try:
-            target_vector = self.embeddings.get_input_vector(sentence.target)
-        except KeyError:
-            raise ValueError(f"{sentence.target} not in dictionary")
-        predicted_vector = self.embeddings.get_input_vector(predicted_sense)
-        similarity = Vectors.cos_sim(target_vector, predicted_vector)
-        return similarity < self.decision_threshold
-
-    def best_fit(self, sentence):
-        candidate_set = self.candidate_source.get_candidate_set(sentence.target)
-        candidate_set.add(sentence.target_token)
-        best_similarity = -1
-        context_vector = self.embeddings.get_mean_vector(sentence.context)
-        best_candidate = sentence.target
-        for candidate in candidate_set:
-            if self.use_output:
-                try:
-                    if len(candidate.split("_")) > 1:
-                        candidate_vector = self.embeddings.get_mean_vector(
-                            tokens=candidate.split("_"), use_input_vecs=False
-                        )
-                    else:
-                        candidate_vector = self.embeddings.get_output_vector(candidate)
-                except ValueError:
-                    print(f"Word {candidate} not in dictionary, ignoring candidate")
-                    continue
-            else:
-                try:
-                    if len(candidate.split("_")) > 1:
-                        candidate_vector = self.embeddings.get_mean_vector(
-                            tokens=candidate.split("_"), use_input_vecs=True
-                        )
-                    else:
-                        candidate_vector = self.embeddings.get_input_vector(candidate)
-                except KeyError:
-                    # print(f"Word {candidate} not in dictionary, ignoring candidate")
-                    continue
-            similarity = Vectors.cos_sim(candidate_vector, context_vector)
-            if similarity >= best_similarity:
-                best_similarity = similarity
-                best_candidate = candidate
-        return best_candidate
