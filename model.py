@@ -82,16 +82,19 @@ class NThresholdModel:
         return scores
 
     def predict(self, sentence):
+        similarity = self.get_compare_value(sentence)
+        scale = self.decision_thresholds + [similarity]
+        scale.sort()
+        return scale.index(similarity)
+
+    def get_compare_value(self, sentence):
         predicted_sense = self.best_fit(sentence)
         try:
             target_vector = self.embeddings.get_input_vector(sentence.target)
         except KeyError:
             raise ValueError(f"{sentence.target} not in dictionary")
         predicted_vector = self.embeddings.get_input_vector(predicted_sense)
-        similarity = Vectors.cos_sim(target_vector, predicted_vector)
-        scale = self.decision_thresholds + [similarity]
-        scale.sort()
-        return scale.index(similarity)
+        return Vectors.cos_sim(target_vector, predicted_vector)
 
     def best_fit(self, sentence):
         candidate_set = self.candidate_source.get_candidate_set(sentence.target)
@@ -127,6 +130,20 @@ class NThresholdModel:
                 best_similarity = similarity
                 best_candidate = candidate
         return best_candidate
+
+    def train_thresholds(self, increment, epochs):
+        for _ in range(epochs):
+            random.shuffle(self.dev_data)
+            for sentence in self.dev_data:
+                comp_value = self.get_compare_value(sentence)
+                prediction = self.predict(sentence)
+                if prediction != sentence.value:
+                    for i, threshold in enumerate(self.decision_thresholds):
+                        if comp_value > threshold and sentence.value <= i:
+                            self.decision_thresholds[i] += increment
+                        if comp_value < threshold and sentence.value > i:
+                            self.decision_thresholds[i] -= increment
+                self.decision_thresholds.sort()
 
 
 class MaoModel(NThresholdModel):
