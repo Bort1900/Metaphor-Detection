@@ -15,6 +15,7 @@ class Sentence:
         value: the label, 0: literal, 1: figurative
         phrase: the phrase containing the target if known
         """
+        self.sentence = sentence
         self.tokens = word_tokenize(sentence)
         self.target = target
         self.value = value
