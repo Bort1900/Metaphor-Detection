@@ -21,20 +21,20 @@ class Sentence:
         self.value = value
         self.phrase = phrase
         wnl = WordNetLemmatizer()
-        target_index = -1
+        self.target_index = -1
         if target in self.tokens:
-            target_index = self.tokens.index(target)
+            self.target_index = self.tokens.index(target)
             self.target_token = target
         else:
             for i, token in enumerate(self.tokens):
                 if target == wnl.lemmatize(token.lower(), pos="v"):
-                    target_index = i
+                    self.target_index = i
                     self.target_token = token.lower()
                     break
-        if target_index < 0:
+        if self.target_index < 0:
             raise ValueError("Target doesn't appear in sentence")
         else:
-            self.context = self.tokens[:target_index] + self.tokens[target_index + 1 :]
+            self.context = self.tokens[:self.target_index] + self.tokens[self.target_index + 1 :]
 
 
 class DataSet:
