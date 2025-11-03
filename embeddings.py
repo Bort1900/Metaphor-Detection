@@ -3,7 +3,11 @@ from sklearn.decomposition import PCA
 import numpy as np
 from wordnet_interface import WordNetInterface
 from nltk.corpus import wordnet as wn
+from data import Sentence
 import time
+import os
+import torch
+from transformers import BertModel, BertTokenizer
 
 
 class Embeddings:
@@ -119,3 +123,35 @@ class WordAssociationEmbeddings(Embeddings):
                         * map_factor
                     )
             return weighted_mean
+
+
+class BertEmbeddings(Embeddings):
+    def __init__(self, layer):
+        self.layer = layer
+        self.model = BertModel.from_pretrained(
+            "bert-base-uncased",
+            output_hidden_states=True,
+            cache_dir=os.path.join("/projekte/semrel/WORK-AREA/Users/navid", "bert"),
+        )
+        self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+
+    def get_input_vector(self, sentence):
+        tokenized = self.tokenizer(sentence.sentence, return_tensors="pt")
+        with torch.no_grad():
+            output = self.model(**tokenized)
+        return output.hidden_states[self.layer][0, sentence.target_index + 1]
+
+    def get_mean_vector(self, sentence, use_input_vecs=True):
+        embeddings = []
+        for token in sentence.tokens:
+            sent = Sentence(
+                sentence=sentence.sentence,
+                target=token,
+                value=sentence.value,
+                phrase=sentence.phrase,
+            )
+            try:
+                embeddings.append(self.get_input_vector(sent))
+            except KeyError:
+                continue
+        return np.mean(embeddings, axis=0)
