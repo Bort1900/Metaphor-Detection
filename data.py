@@ -3,6 +3,7 @@ import pandas as pd
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
 import random
+import re
 import math
 import numpy as np
 
@@ -34,7 +35,34 @@ class Sentence:
         if self.target_index < 0:
             raise ValueError("Target doesn't appear in sentence")
         else:
-            self.context = self.tokens[:self.target_index] + self.tokens[self.target_index + 1 :]
+            self.context = (
+                self.tokens[: self.target_index] + self.tokens[self.target_index + 1 :]
+            )
+
+    def replace_target(self, new_target, split_multi_word=True):
+        if split_multi_word:
+            new_sentence = self.sentence.replace(
+                self.tokens[self.target_index], " ".join(new_target.split("_")), 1
+            )
+            target = new_target.split("_")[0]
+        else:
+            new_sentence = self.sentence.replace(
+                self.tokens[self.target_index], new_target, 1
+            )
+            target = new_target
+        output = Sentence(
+            sentence=new_sentence,
+            target=target,
+            value=self.value,
+            phrase=self.phrase,
+        )
+        if split_multi_word:
+            output.target_index = [
+                output.target_index + i for i in range(len(new_target.split("_")))
+            ]
+            output.target = new_target.split("_")
+            output.target_token = output.target
+        return output
 
 
 class DataSet:
