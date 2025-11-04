@@ -189,7 +189,7 @@ class MaoModel(NThresholdModel):
         """
 
         if batch_size < 0:
-            batch_size= len(self.dev_data)
+            batch_number= len(self.dev_data)
         else:
             batch_number = math.floor(len(self.dev_data) / batch_size)
         alternating_counter = 0  # checks for jumping over optimum
