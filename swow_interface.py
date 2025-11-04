@@ -16,19 +16,45 @@ class SWOWInterface:
             else "strength.SWOW-EN.R123.20180827.csv"
         )
         self.response_file = "SWOW-EN.complete.20180827.csv"
-        self.association_table, self.association_strength_table = self.init_tables()
         self.stops = stopwords.words("english")
         self.num_responses = number_of_responses
+        (
+            self.cues_to_responses,
+            self.responses_to_cues,
+            self.association_strength_table,
+        ) = self.init_tables()
         self.index()
 
     def init_tables(self):
-        associations = pd.read_csv(
-            os.path.join(self.work_dir, self.response_file),
-            usecols=["id", "cue", "R1Raw", "R2Raw", "R3Raw", "R1", "R2", "R3"],
-        )
-        associations[["cue", "R1", "R2", "R3"]] = associations[
-            ["cue", "R1", "R2", "R3"]
-        ].replace(to_replace=re.compile(f"\\s"), value="_")
+        cues_to_responses = dict()
+        responses_to_cues = dict()
+        with open(
+            os.path.join(self.work_dir, self.response_file), "r", encoding="utf-8"
+        ) as assocs:
+            assocs.readline()
+            for line in assocs:
+                values = [item.strip()[1:-1] for item in line.split(",")]
+                if len(values) < 18:
+                    continue
+                if values[11] in cues_to_responses:
+                    cues_to_responses[values[11]] += [
+                        re.sub(f"\\s", "_", values[15 + i])
+                        for i in range(self.num_responses)
+                    ]
+                else:
+                    cues_to_responses[values[11]] = [
+                        re.sub(f"\\s", "_", values[15 + i])
+                        for i in range(self.num_responses)
+                    ]
+                for i in range(self.num_responses):
+                    if values[15 + i] in responses_to_cues:
+                        responses_to_cues[values[15 + i]].append(
+                            re.sub(f"\\s", "_", values[11])
+                        )
+                    else:
+                        responses_to_cues[values[15 + i]] = [
+                            re.sub(f"\\s", "_", values[11])
+                        ]
         strengths = pd.read_csv(
             os.path.join(self.work_dir, self.strength_file),
             keep_default_na=False,
@@ -39,7 +65,7 @@ class SWOWInterface:
         strengths[["cue", "response"]] = strengths[["cue", "response"]].replace(
             to_replace=re.compile(f"\\s"), value="_"
         )
-        return associations, strengths
+        return cues_to_responses, responses_to_cues, strengths
 
     def index(self):
         cue_arr = self.association_strength_table["cue"].to_numpy()
@@ -59,14 +85,12 @@ class SWOWInterface:
                 self.response_to_index[response] = [i]
 
     def get_candidate_set(self, cue):
-        relevant_tables = ["R1", "R2", "R3"][: self.num_responses]
-        cue_table = self.association_table[self.association_table["cue"] == cue][
-            relevant_tables
-        ]
-        associations = []
-        for col in cue_table.columns:
-            associations += [assoc for assoc in cue_table[col]]
-        return set(associations).difference(self.stops)
+        output = set()
+        if cue in self.cues_to_responses:
+            output.update(self.cues_to_responses[cue])
+        if cue in self.responses_to_cues:
+            output.update(self.responses_to_cues[cue])
+        return output.difference(self.stops)
 
     def get_neighbour_nodes(self, token):
         output = set()
