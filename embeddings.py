@@ -133,25 +133,38 @@ class BertEmbeddings(Embeddings):
             output_hidden_states=True,
             cache_dir=os.path.join("/projekte/semrel/WORK-AREA/Users/navid", "bert"),
         )
+
+        if torch.cuda.is_available():
+            self.model.to("cuda")
         self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
 
     def get_input_vector(self, sentence):
         tokenized = self.tokenizer(sentence.sentence, return_tensors="pt")
+        if torch.cuda.is_available():
+            tokenized.to("cuda")
         with torch.no_grad():
             output = self.model(**tokenized)
-        return output.hidden_states[self.layer][0, sentence.target_index + 1]
+        if type(sentence.target_index) != int:
+            return torch.stack(
+                [
+                    output.hidden_states[self.layer][0, i + 1]
+                    for i in sentence.target_index
+                ]
+            ).mean(dim=0)
+        else:
+            return output.hidden_states[self.layer][0, sentence.target_index + 1]
 
     def get_mean_vector(self, sentence, use_input_vecs=True):
         embeddings = []
         for token in sentence.tokens:
-            sent = Sentence(
+            token_sent = Sentence(
                 sentence=sentence.sentence,
                 target=token,
                 value=sentence.value,
                 phrase=sentence.phrase,
             )
             try:
-                embeddings.append(self.get_input_vector(sent))
+                embeddings.append(self.get_input_vector(token_sent))
             except KeyError:
                 continue
-        return np.mean(embeddings, axis=0)
+        return torch.stack(embeddings).mean(dim=0)
