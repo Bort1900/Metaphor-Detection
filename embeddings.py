@@ -24,6 +24,8 @@ class Embeddings:
                     continue
         else:
             embeddings = [self.get_output_vector(token) for token in tokens]
+        if len(embeddings) == 0:
+            raise ValueError("None of the tokens are known")
         return np.mean(embeddings, axis=0)
 
     def get_input_vector(self, token):
