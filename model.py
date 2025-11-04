@@ -99,9 +99,9 @@ class NThresholdModel:
         predicted_sense = self.best_fit(sentence)
         try:
             target_vector = self.embeddings.get_input_vector(sentence.target)
+            predicted_vector = self.embeddings.get_input_vector(predicted_sense)
         except KeyError:
             raise ValueError(f"{sentence.target} not in dictionary")
-        predicted_vector = self.embeddings.get_input_vector(predicted_sense)
         return Vectors.cos_sim(target_vector, predicted_vector)
 
     def best_fit(self, sentence):
@@ -189,7 +189,7 @@ class MaoModel(NThresholdModel):
         """
 
         if batch_size < 0:
-            batch_number= len(self.dev_data)
+            batch_number = len(self.dev_data)
         else:
             batch_number = math.floor(len(self.dev_data) / batch_size)
         alternating_counter = 0  # checks for jumping over optimum
