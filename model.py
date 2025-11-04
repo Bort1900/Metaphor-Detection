@@ -141,15 +141,22 @@ class NThresholdModel:
         return best_candidate
 
     def train_thresholds(self, increment, epochs):
+        data_per_class = [
+            [sentence for sentence in self.dev_data if sentence.value == i]
+            for i in range(self.num_classes)
+        ]
+        num_per_class = math.floor(len(self.dev_data) / self.num_classes)
         for epoch in range(epochs):
             print(f"Epoch {epoch+1}")
-            random.shuffle(self.dev_data)
-            for sentence in tqdm(self.dev_data):
+            data = []
+            for class_data in data_per_class:
+                data += random.choices(population=class_data, k=num_per_class)
+            for sentence in tqdm(data):
                 try:
                     comp_value = self.get_compare_value(sentence)
                     prediction = int(self.predict(sentence))
                 except ValueError:
-                    # print(f"{sentence.target} not in dictionary, ignoring sentence")
+                    print(f"{sentence.target} not in dictionary, ignoring sentence")
                     continue
                 if prediction != sentence.value:
                     for i, threshold in enumerate(self.decision_thresholds):
