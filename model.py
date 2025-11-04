@@ -2,7 +2,10 @@ import random
 from data import Vectors
 import numpy as np
 import time
+import torch
+from torch.nn import CosineSimilarity
 from tqdm import tqdm
+from data import Sentence
 import math
 
 
@@ -138,9 +141,10 @@ class NThresholdModel:
         return best_candidate
 
     def train_thresholds(self, increment, epochs):
-        for _ in range(epochs):
+        for epoch in range(epochs):
+            print(f"Epoch {epoch+1}")
             random.shuffle(self.dev_data)
-            for sentence in self.dev_data:
+            for sentence in tqdm(self.dev_data):
                 try:
                     comp_value = self.get_compare_value(sentence)
                     prediction = int(self.predict(sentence))
@@ -154,6 +158,7 @@ class NThresholdModel:
                         if comp_value < threshold and sentence.value > i:
                             self.decision_thresholds[i] -= increment
                 self.decision_thresholds.sort()
+            print(f"Current Thresholds: {self.decision_thresholds}")
 
 
 class MaoModel(NThresholdModel):
@@ -184,7 +189,7 @@ class MaoModel(NThresholdModel):
         """
 
         if batch_size < 0:
-            batch_size = len(self.dev_data)
+            batch_size= len(self.dev_data)
         else:
             batch_number = math.floor(len(self.dev_data) / batch_size)
         alternating_counter = 0  # checks for jumping over optimum
@@ -263,3 +268,49 @@ class MaoModel(NThresholdModel):
                     f"{round(self.decision_thresholds[0],2)}\t{round(scores["precision_class_0"],2)}\t{round(scores["recall_class_0"],2)}\t{round(scores["f_1_class_0"],2)}\t{round(scores["f_1_class_1"],2)}\t{round(scores["macro_f_1"],2)}\n"
                 )
                 self.decision_thresholds[0] += steps
+
+
+class ContextualMaoModel(NThresholdModel):
+    def __init__(
+        self,
+        dev_data,
+        test_data,
+        candidate_source,
+        mean_multi_word,
+        embeddings,
+        num_classes=2,
+    ):
+        super().__init__(
+            dev_data=dev_data,
+            test_data=test_data,
+            candidate_source=candidate_source,
+            mean_multi_word=mean_multi_word,
+            embeddings=embeddings,
+            use_output_vec=False,
+            num_classes=num_classes,
+        )
+        self.cos = CosineSimilarity(dim=0, eps=1e-6)
+
+    def best_fit(self, sentence):
+        candidate_set = self.candidate_source.get_candidate_set(sentence.target)
+        candidate_set.add(sentence.target_token)
+        best_similarity = -1
+        context_vector = self.embeddings.get_context_vector(sentence)
+        best_candidate = sentence.target
+        for candidate in candidate_set.difference([sentence.target]):
+            new_sent = sentence.replace_target(candidate, self.mean_multi_word)
+            candidate_vector = self.embeddings.get_input_vector(new_sent)
+            similarity = self.cos(candidate_vector, context_vector)
+            if similarity >= best_similarity:
+                best_similarity = similarity
+                best_candidate = candidate
+        return best_candidate
+
+    def get_compare_value(self, sentence):
+        predicted_sense = self.best_fit(sentence)
+        target_vector = self.embeddings.get_input_vector(sentence)
+        predicted_sentence = sentence.replace_target(
+            predicted_sense, self.mean_multi_word
+        )
+        predicted_vector = self.embeddings.get_input_vector(predicted_sentence)
+        return self.cos(target_vector, predicted_vector)

@@ -168,3 +168,19 @@ class BertEmbeddings(Embeddings):
             except KeyError:
                 continue
         return torch.stack(embeddings).mean(dim=0)
+
+    def get_context_vector(self, sentence):
+        embeddings = []
+        for i, token in enumerate(sentence.tokens):
+            if i != sentence.target_index:
+                token_sent = Sentence(
+                    sentence=sentence.sentence,
+                    target=token,
+                    value=sentence.value,
+                    phrase=sentence.phrase,
+                )
+                try:
+                    embeddings.append(self.get_input_vector(token_sent))
+                except KeyError:
+                    continue
+        return torch.stack(embeddings).mean(dim=0)
