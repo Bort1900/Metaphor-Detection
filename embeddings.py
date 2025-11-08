@@ -85,14 +85,20 @@ class WordAssociationEmbeddings(Embeddings):
         swow,
         index_file,
         embedding_file,
+        use_only_cues,
         alpha=0.75,
         dimensions=-1,
     ):
-        matrix, indices = swow.get_association_strength_matrix(use_only_cues=True)
+        matrix, indices = swow.get_association_strength_matrix(
+            use_only_cues=use_only_cues
+        )
         with open(index_file, "w", encoding="utf-8") as output:
             for key in indices:
                 output.write(str(key) + "\n")
-        embeddings = np.linalg.inv(np.identity(len(indices)) - matrix * alpha)
+        if use_only_cues:
+            embeddings = np.linalg.inv(np.identity(len(indices)) - matrix * alpha)
+        else:
+            embeddings = matrix
         if dimensions > 0:
             pca = PCA(n_components=dimensions)
             embeddings = pca.fit_transform(embeddings)
