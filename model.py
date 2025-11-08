@@ -151,6 +151,7 @@ class NThresholdModel:
             data = []
             for class_data in data_per_class:
                 data += random.choices(population=class_data, k=num_per_class)
+            random.shuffle(data)
             for sentence in tqdm(data):
                 try:
                     comp_value = self.get_compare_value(sentence)
