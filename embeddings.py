@@ -117,9 +117,9 @@ class WordAssociationEmbeddings(Embeddings):
             return self.embeddings[token_index]
         else:
             neighbouring_nodes = self.swow.get_weighted_neighbours(token)
-            if len(neighbouring_nodes) == 0:
-                raise KeyError(f"{token} is not in word association graph")
             total = sum([weight for weight in neighbouring_nodes.values()])
+            if len(neighbouring_nodes) == 0 or total == 0:
+                raise KeyError(f"{token} is not in word association graph")
             map_factor = 1 / total
             weighted_mean = np.zeros(self.mean_vector.shape)
             for neighbour in neighbouring_nodes:
