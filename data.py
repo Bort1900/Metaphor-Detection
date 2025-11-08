@@ -43,7 +43,7 @@ class Sentence:
 
     def replace_target(self, new_target, split_multi_word=True):
         """
-        create a new sentence where the target is replaced by another word
+        returns a new Sentence instance where the target is replaced by another word
         new_target: the word replacing the old target
         split_multi_word: if flagged, this will look for multi word tokens(indicated by "_") and split them up to replace the old target with multiple words
         """
@@ -84,7 +84,7 @@ class DataSet:
 
     def get_splits(self, splits):
         """
-        returns train, dev and test splits of the data
+        returns train, dev and test splits of the data as a list of three lists
         splits: list of 3 values for train, dev and test split proportion in that order
         """
         if len(splits) != 3:

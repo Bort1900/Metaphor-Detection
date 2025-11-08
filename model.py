@@ -20,6 +20,16 @@ class NThresholdModel:
         use_output_vec,
         num_classes=2,
     ):
+        """
+        Model that categorizes Sentence data in n classes based on n-1 thresholds and uses a candidate set for getting the value
+        dev_data: list of Sentence instances to train thresholds
+        test_data: list of Sentence instances to evaluate model
+        candidate_source: an object with a get_candidate_set function
+        mean_multi_word: whether embeddings for multi-word tokens should be mean pooled from the embeddings of the individual words
+        embeddings: source for embeddings for comparing
+        use_output_vec: whether ouput vectors(word2vec) should be used for comparing context to candidates
+        num_classes: number of classes to classify
+        """
         self.dev_data = dev_data
         self.test_data = test_data
         self.candidate_source = candidate_source
@@ -31,6 +41,10 @@ class NThresholdModel:
 
     @staticmethod
     def calculate_scores(confusion_matrix):
+        """
+        calculates and returns precision, recall, and f-score metrics for a given evaluation as a dictionary
+        confusion_matrix: result of the evaluation, prediction vs actual classes
+        """
         num_classes = len(confusion_matrix)
         scores = dict()
         for i in range(num_classes):
@@ -71,6 +85,10 @@ class NThresholdModel:
         return scores
 
     def evaluate(self, data):
+        """
+        returns a dictionary of recall, precision and f-score metrics after evaluating the model on test data
+        data: test data for evaluation
+        """
         confusion_matrix = np.zeros([self.num_classes, self.num_classes])
         ignore_count = 0
         for sentence in tqdm(data):
@@ -87,6 +105,10 @@ class NThresholdModel:
         return scores
 
     def predict(self, sentence):
+        """
+        returns the class that the model predicts for a given instance
+        sentence: instance to classify
+        """
         try:
             similarity = self.get_compare_value(sentence)
         except ValueError:
@@ -96,6 +118,10 @@ class NThresholdModel:
         return scale.index(similarity)
 
     def get_compare_value(self, sentence):
+        """
+        returns the value that is compared with the model's thresholds
+        sentence: the instance that should be classified
+        """
         predicted_sense = self.best_fit(sentence)
         try:
             target_vector = self.embeddings.get_input_vector(sentence.target)
@@ -105,6 +131,10 @@ class NThresholdModel:
         return Vectors.cos_sim(target_vector, predicted_vector)
 
     def best_fit(self, sentence):
+        """
+        returns the best fiting instance from the candidate set to calculate the threshold
+        sentence: the instance that should be classified
+        """
         candidate_set = self.candidate_source.get_candidate_set(sentence.target)
         candidate_set.add(sentence.target_token)
         best_similarity = -1
@@ -141,6 +171,11 @@ class NThresholdModel:
         return best_candidate
 
     def train_thresholds(self, increment, epochs):
+        """
+        trains the model's threshold on the dev_data
+        increment: how much the threshold should be changed on a wrong prediction
+        epochs: number of times the dev_data is run through the training process
+        """
         data_per_class = [
             [sentence for sentence in self.dev_data if sentence.value == i]
             for i in range(self.num_classes)
