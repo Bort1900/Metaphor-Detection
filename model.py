@@ -357,3 +357,138 @@ class ContextualMaoModel(NThresholdModel):
         )
         predicted_vector = self.embeddings.get_input_vector(predicted_sentence)
         return self.cos(target_vector, predicted_vector)
+
+
+class ComparingModel(NThresholdModel):
+    def __init__(
+        self,
+        dev_data,
+        test_data,
+        candidate_source,
+        mean_multi_word,
+        literal_embeddings,
+        associative_embeddings,
+        use_output_vec,
+        num_classes=2,
+    ):
+        """
+        model that compares literal and associative similarity and predicts metaphoricity with a threshold
+        associative_embeddings: WordAssociationEmbeddings instance
+        """
+        super().__init__(
+            dev_data=dev_data,
+            test_data=test_data,
+            candidate_source=candidate_source,
+            mean_multi_word=mean_multi_word,
+            embeddings=literal_embeddings,
+            use_output_vec=use_output_vec,
+            num_classes=num_classes,
+        )
+        self.literal_embeddings = self.embeddings
+        self.associative_embeddings = associative_embeddings
+        self.map_factor = 1  # mapping the size of one embedding space to the other for linear transform
+
+    def get_compare_value(self, sentence):
+        """
+        get a value by comparing literal and associative similarities to context
+        sentence: the Sentence instance for the calculation
+        """
+        try:
+            literal_similarity, associative_similarity = self.get_similarities(sentence)
+        except KeyError:
+            raise KeyError("could not calculate comparison value")
+        return self.map_factor * associative_similarity - literal_similarity
+
+    def get_similarities(self, sentence):
+        """
+        returns the literal and associative similarity of the target to the context
+        sentence: the Sentence instance for the calculation
+        """
+        try:
+            literal_context_vec = self.literal_embeddings.get_mean_vector(
+                sentence.tokens, not self.use_output
+            )
+            associative_context_vec = self.associative_embeddings.get_mean_vector(
+                sentence.tokens
+            )
+            if self.use_output:
+                literal_vec = self.literal_embeddings.get_output_vector(sentence.target)
+            else:
+                literal_vec = self.literal_embeddings.get_input_vector(sentence.target)
+            associative_vec = self.associative_embeddings.get_input_vector(
+                sentence.target
+            )
+        except KeyError:
+            raise KeyError("Could not calculate the necessary embeddings")
+        return Vectors.cos_sim(literal_context_vec, literal_vec), Vectors.cos_sim(
+            associative_context_vec, associative_vec
+        )
+
+    def estimate_map_factor(self):
+        """
+        estimates the factor for mapping from one embedding space to the other using dev data
+        """
+        # finding the ranges of the two embeddings spaces
+        print("estimating mapping factor")
+        smallest_literal = 10
+        smallest_associative = 10
+        largest_literal = -10
+        largest_associative = -10
+        ignore_count = 0
+        for sentence in self.dev_data:
+            try:
+                literal_similarity, associative_similarity = self.get_similarities(
+                    sentence
+                )
+            except KeyError:
+                ignore_count += 1
+                continue
+            if literal_similarity < smallest_literal:
+                smallest_literal = literal_similarity
+            if literal_similarity > largest_literal:
+                largest_literal = literal_similarity
+            if associative_similarity < smallest_associative:
+                smallest_associative = associative_similarity
+            if associative_similarity > largest_associative:
+                largest_associative = associative_similarity
+            self.map_factor = (largest_literal - smallest_literal) / (
+                largest_associative - smallest_associative
+            )
+        print(f"ignored {ignore_count} of {len(self.dev_data)} sentences")
+        print(f"mapping factor: {self.map_factor}")
+
+    def train_thresholds(self, increment, epochs):
+        """
+        trains the model's threshold on the dev_data
+        increment: how much the threshold should be changed on a wrong prediction
+        epochs: number of times the dev_data is run through the training process
+        """
+        ignore_count = 0
+        self.estimate_map_factor()
+        data_per_class = [
+            [sentence for sentence in self.dev_data if sentence.value == i]
+            for i in range(self.num_classes)
+        ]
+        num_per_class = math.floor(len(self.dev_data) / self.num_classes)
+        for epoch in range(epochs):
+            print(f"Epoch {epoch+1}")
+            data = []
+            for class_data in data_per_class:
+                data += random.choices(population=class_data, k=num_per_class)
+            random.shuffle(data)
+            for sentence in tqdm(data):
+                try:
+                    comp_value = self.get_compare_value(sentence)
+                    prediction = int(self.predict(sentence))
+                except ValueError:
+                    ignore_count += 1
+                    continue
+                if prediction != sentence.value:
+                    for i, threshold in enumerate(self.decision_thresholds):
+                        if comp_value > threshold and sentence.value <= i:
+                            self.decision_thresholds[i] += increment
+                        if comp_value < threshold and sentence.value > i:
+                            self.decision_thresholds[i] -= increment
+                self.decision_thresholds.sort()
+            print(f"ignored {ignore_count} of {len(data)}")
+            print(f"Current Thresholds: {self.decision_thresholds}")
