@@ -364,8 +364,6 @@ class ComparingModel(NThresholdModel):
         self,
         dev_data,
         test_data,
-        candidate_source,
-        mean_multi_word,
         literal_embeddings,
         associative_embeddings,
         use_output_vec,
@@ -378,8 +376,8 @@ class ComparingModel(NThresholdModel):
         super().__init__(
             dev_data=dev_data,
             test_data=test_data,
-            candidate_source=candidate_source,
-            mean_multi_word=mean_multi_word,
+            candidate_source=None,
+            mean_multi_word=None,
             embeddings=literal_embeddings,
             use_output_vec=use_output_vec,
             num_classes=num_classes,
@@ -396,8 +394,8 @@ class ComparingModel(NThresholdModel):
         try:
             literal_similarity, associative_similarity = self.get_similarities(sentence)
         except KeyError:
-            raise KeyError("could not calculate comparison value")
-        return self.map_factor * associative_similarity - literal_similarity
+            raise ValueError("could not calculate comparison value")
+        return self.map_factor * literal_similarity - associative_similarity
 
     def get_similarities(self, sentence):
         """
@@ -406,10 +404,10 @@ class ComparingModel(NThresholdModel):
         """
         try:
             literal_context_vec = self.literal_embeddings.get_mean_vector(
-                sentence.tokens, not self.use_output
+                sentence.context, not self.use_output
             )
             associative_context_vec = self.associative_embeddings.get_mean_vector(
-                sentence.tokens
+                sentence.context
             )
             if self.use_output:
                 literal_vec = self.literal_embeddings.get_output_vector(sentence.target)
@@ -451,9 +449,13 @@ class ComparingModel(NThresholdModel):
                 smallest_associative = associative_similarity
             if associative_similarity > largest_associative:
                 largest_associative = associative_similarity
-            self.map_factor = (largest_literal - smallest_literal) / (
-                largest_associative - smallest_associative
-            )
+
+        self.map_factor = (largest_associative - smallest_associative) / (
+            largest_literal - smallest_literal
+        )
+        print(
+            largest_associative, smallest_associative, largest_literal, smallest_literal
+        )
         print(f"ignored {ignore_count} of {len(self.dev_data)} sentences")
         print(f"mapping factor: {self.map_factor}")
 
@@ -492,3 +494,40 @@ class ComparingModel(NThresholdModel):
                 self.decision_thresholds.sort()
             print(f"ignored {ignore_count} of {len(data)}")
             print(f"Current Thresholds: {self.decision_thresholds}")
+
+    def evaluate_per_threshold(self, start, steps, increment, save_file):
+        self.estimate_map_factor()
+        self.decision_thresholds = [start]
+        with open(save_file, "w", encoding="utf-8") as output:
+            output.write(
+                "Threshold\tPrecision\tRecall\tF1(Class 1)\tF1(Class 2)\tF1(Macro-Average)\n"
+            )
+            for i in range(steps):
+                scores = self.evaluate(self.test_data)
+                output.write(
+                    f"{round(self.decision_thresholds[0],2)}\t{round(scores["precision_class_0"],2)}\t{round(scores["recall_class_0"],2)}\t{round(scores["f_1_class_0"],2)}\t{round(scores["f_1_class_1"],2)}\t{round(scores["macro_f_1"],2)}\n"
+                )
+                self.decision_thresholds[0] += increment
+
+
+class RandomBaseline(MaoModel):
+    def __init__(
+        self,
+        dev_data,
+        test_data,
+        candidate_source,
+        embeddings,
+    ):
+        super().__init__(
+            dev_data=dev_data,
+            test_data=test_data,
+            candidate_source=candidate_source,
+            mean_multi_word=False,
+            embeddings=embeddings,
+            use_output_vec=False,
+        )
+
+    def best_fit(self, sentence):
+        candidate_set = self.candidate_source.get_candidate_set(sentence.target)
+        candidate_set.add(sentence.target_token)
+        return random.choice(list(candidate_set))
