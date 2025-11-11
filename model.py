@@ -203,6 +203,22 @@ class NThresholdModel:
                 self.decision_thresholds.sort()
             print(f"Current Thresholds: {self.decision_thresholds}")
 
+    def evaluate_per_threshold(self, start, steps, increment, save_file):
+        if self.num_classes > 2:
+            raise ValueError("only works for 2 classes")
+        self.estimate_map_factor()
+        self.decision_thresholds = [start]
+        with open(save_file, "w", encoding="utf-8") as output:
+            output.write(
+                "Threshold\tPrecision\tRecall\tF1(Class 1)\tF1(Class 2)\tF1(Macro-Average)\n"
+            )
+            for i in range(steps):
+                scores = self.evaluate(self.test_data)
+                output.write(
+                    f"{round(self.decision_thresholds[0],2)}\t{round(scores["precision_class_0"],2)}\t{round(scores["recall_class_0"],2)}\t{round(scores["f_1_class_0"],2)}\t{round(scores["f_1_class_1"],2)}\t{round(scores["macro_f_1"],2)}\n"
+                )
+                self.decision_thresholds[0] += increment
+
 
 class MaoModel(NThresholdModel):
     def __init__(
@@ -299,21 +315,8 @@ class MaoModel(NThresholdModel):
         self.decision_threshold = best_threshold
         print(f"Best Threshold: {self.decision_threshold}, F-Score: {best_f_score}")
 
-    def evaluate_per_threshold(self, steps, save_file):
-        self.decision_thresholds = [0]
-        with open(save_file, "w", encoding="utf-8") as output:
-            output.write(
-                "Threshold\tPrecision\tRecall\tF1(Class 1)\tF1(Class 2)\tF1(Macro-Average)\n"
-            )
-            while self.decision_thresholds[0] < 1:
-                scores = self.evaluate(self.test_data)
-                output.write(
-                    f"{round(self.decision_thresholds[0],2)}\t{round(scores["precision_class_0"],2)}\t{round(scores["recall_class_0"],2)}\t{round(scores["f_1_class_0"],2)}\t{round(scores["f_1_class_1"],2)}\t{round(scores["macro_f_1"],2)}\n"
-                )
-                self.decision_thresholds[0] += steps
 
-
-class ContextualMaoModel(NThresholdModel):
+class ContextualMaoModel:
     def __init__(
         self,
         dev_data,
@@ -494,20 +497,6 @@ class ComparingModel(NThresholdModel):
                 self.decision_thresholds.sort()
             print(f"ignored {ignore_count} of {len(data)}")
             print(f"Current Thresholds: {self.decision_thresholds}")
-
-    def evaluate_per_threshold(self, start, steps, increment, save_file):
-        self.estimate_map_factor()
-        self.decision_thresholds = [start]
-        with open(save_file, "w", encoding="utf-8") as output:
-            output.write(
-                "Threshold\tPrecision\tRecall\tF1(Class 1)\tF1(Class 2)\tF1(Macro-Average)\n"
-            )
-            for i in range(steps):
-                scores = self.evaluate(self.test_data)
-                output.write(
-                    f"{round(self.decision_thresholds[0],2)}\t{round(scores["precision_class_0"],2)}\t{round(scores["recall_class_0"],2)}\t{round(scores["f_1_class_0"],2)}\t{round(scores["f_1_class_1"],2)}\t{round(scores["macro_f_1"],2)}\n"
-                )
-                self.decision_thresholds[0] += increment
 
 
 class RandomBaseline(MaoModel):
