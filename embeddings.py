@@ -3,6 +3,7 @@ from sklearn.decomposition import PCA
 import numpy as np
 from wordnet_interface import WordNetInterface
 from nltk.corpus import wordnet as wn
+from nltk.corpus import stopwords
 from data import Sentence
 import time
 import os
@@ -141,7 +142,7 @@ class BertEmbeddings(Embeddings):
             output_hidden_states=True,
             cache_dir=os.path.join("/projekte/semrel/WORK-AREA/Users/navid", "bert"),
         )
-
+        self.stops = stopwords.words("english")
         if torch.cuda.is_available():
             self.model.to("cuda")
         self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
@@ -180,13 +181,14 @@ class BertEmbeddings(Embeddings):
     def get_context_vector(self, sentence):
         embeddings = []
         for i, token in enumerate(sentence.tokens):
-            if i != sentence.target_index:
+            if i != sentence.target_index and token.lower() not in self.stops:
                 token_sent = Sentence(
                     sentence=sentence.sentence,
                     target=token,
                     value=sentence.value,
                     phrase=sentence.phrase,
                 )
+                print(token_sent.sentence, token_sent.target, token_sent.target_index)
                 try:
                     embeddings.append(self.get_input_vector(token_sent))
                 except KeyError:

@@ -41,7 +41,7 @@ class Sentence:
                 self.tokens[: self.target_index] + self.tokens[self.target_index + 1 :]
             )
 
-    def replace_target(self, new_target, split_multi_word=True):
+    def replace_target(self, new_target, split_multi_word=True, target_index=-1):
         """
         returns a new Sentence instance where the target is replaced by another word
         new_target: the word replacing the old target
@@ -64,11 +64,18 @@ class Sentence:
             phrase=self.phrase,
         )
         if split_multi_word:
-            output.target_index = [
-                output.target_index + i for i in range(len(new_target.split("_")))
-            ]
+            if target_index >= 0:
+                output.target_index = [
+                    target_index + i for i in range(len(new_target.split("_")))
+                ]
+            else:
+                output.target_index = [
+                    output.target_index + i for i in range(len(new_target.split("_")))
+                ]
             output.target = new_target.split("_")
             output.target_token = output.target
+        elif target_index >= 0:
+            output.target_index = target_index
         return output
 
 
