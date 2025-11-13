@@ -9,13 +9,13 @@ import re
 
 
 class SWOWInterface:
-    def __init__(self, number_of_responses, strength_file=None,use_ppmi=False):
+    def __init__(self, number_of_responses, strength_file=None, use_ppmi=False):
         self.work_dir = "/projekte/semrel/WORK-AREA/Users/navid/SWOW-EN18"
         self.strength_file = strength_file
         self.response_file = "SWOW-EN.complete.20180827.csv"
         self.stops = stopwords.words("english")
         self.num_responses = number_of_responses
-        self.use_ppmi=use_ppmi
+        self.use_ppmi = use_ppmi
         if self.strength_file:
             self.cues_to_responses, self.responses_to_cues = self.init_response_table()
         else:
@@ -90,7 +90,7 @@ class SWOWInterface:
                 if response == "#Total_Count#":
                     continue
                 responses.add(response)
-                denominator=0
+                denominator = 0
                 if self.use_ppmi:
                     for cue_i in self.responses_to_cues[response]:
                         denominator += self.get_relative_probability(cue_i, response)
