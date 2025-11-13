@@ -206,7 +206,6 @@ class NThresholdModel:
     def evaluate_per_threshold(self, start, steps, increment, save_file):
         if self.num_classes > 2:
             raise ValueError("only works for 2 classes")
-        self.estimate_map_factor()
         self.decision_thresholds = [start]
         with open(save_file, "w", encoding="utf-8") as output:
             output.write(
@@ -316,7 +315,7 @@ class MaoModel(NThresholdModel):
         print(f"Best Threshold: {self.decision_threshold}, F-Score: {best_f_score}")
 
 
-class ContextualMaoModel:
+class ContextualMaoModel(NThresholdModel):
     def __init__(
         self,
         dev_data,
@@ -343,10 +342,22 @@ class ContextualMaoModel:
         best_similarity = -1
         context_vector = self.embeddings.get_context_vector(sentence)
         best_candidate = sentence.target
-        for candidate in candidate_set.difference([sentence.target]):
-            new_sent = sentence.replace_target(candidate, self.mean_multi_word)
+        comparison_sentence = Sentence(
+            sentence=f"I associate {sentence.target} with xyz", target="xyz", value=0
+        )
+        for candidate in candidate_set:
+            try:
+                new_sent = comparison_sentence.replace_target(
+                    candidate,
+                    self.mean_multi_word,
+                    target_index=comparison_sentence.target_index,
+                )
+            except:
+                breakpoint()
+            print(new_sent.sentence, new_sent.target, new_sent.target_index)
             candidate_vector = self.embeddings.get_input_vector(new_sent)
             similarity = self.cos(candidate_vector, context_vector)
+            print(similarity)
             if similarity >= best_similarity:
                 best_similarity = similarity
                 best_candidate = candidate
@@ -354,11 +365,25 @@ class ContextualMaoModel:
 
     def get_compare_value(self, sentence):
         predicted_sense = self.best_fit(sentence)
-        target_vector = self.embeddings.get_input_vector(sentence)
-        predicted_sentence = sentence.replace_target(
-            predicted_sense, self.mean_multi_word
+        comparison_target_sentence = Sentence(
+            sentence=f"I associate {sentence.target} with {predicted_sense}.",
+            target=sentence.target,
+            value=0,
         )
-        predicted_vector = self.embeddings.get_input_vector(predicted_sentence)
+        comparison_candidate_sentence = Sentence(
+            sentence=f"I associate {sentence.target} with xyz.",
+            target="xyz",
+            value=0,
+        )
+        comparison_candidate_sentence = comparison_candidate_sentence.replace_target(
+            new_target=predicted_sense,
+            split_multi_word=self.mean_multi_word,
+            target_index=comparison_candidate_sentence.target_index,
+        )
+        target_vector = self.embeddings.get_input_vector(comparison_target_sentence)
+        predicted_vector = self.embeddings.get_input_vector(
+            comparison_candidate_sentence
+        )
         return self.cos(target_vector, predicted_vector)
 
 
@@ -424,6 +449,10 @@ class ComparingModel(NThresholdModel):
         return Vectors.cos_sim(literal_context_vec, literal_vec), Vectors.cos_sim(
             associative_context_vec, associative_vec
         )
+
+    def evaluate_per_threshold(self, start, steps, increment, save_file):
+        self.estimate_map_factor()
+        return super().evaluate_per_threshold(start, steps, increment, save_file)
 
     def estimate_map_factor(self):
         """
