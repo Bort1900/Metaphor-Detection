@@ -9,12 +9,13 @@ import re
 
 
 class SWOWInterface:
-    def __init__(self, number_of_responses, strength_file=None):
+    def __init__(self, number_of_responses, strength_file=None,use_ppmi=False):
         self.work_dir = "/projekte/semrel/WORK-AREA/Users/navid/SWOW-EN18"
         self.strength_file = strength_file
         self.response_file = "SWOW-EN.complete.20180827.csv"
         self.stops = stopwords.words("english")
         self.num_responses = number_of_responses
+        self.use_ppmi=use_ppmi
         if self.strength_file:
             self.cues_to_responses, self.responses_to_cues = self.init_response_table()
         else:
@@ -82,24 +83,29 @@ class SWOWInterface:
         cues_to_index = dict()
         responses = set()
         pairs_to_strength = dict()
+        num_cues = len(self.cues_to_responses)
         for i, cue in enumerate(self.cue_response_count):
-            num_cues = len(self.cues_to_responses)
             cues_to_index[cue] = i
             for response in self.cue_response_count[cue]:
                 if response == "#Total_Count#":
                     continue
                 responses.add(response)
-                denominator = 0
-                for cue_i in self.responses_to_cues[response]:
-                    denominator += self.get_relative_probability(cue_i, response)
-                pairs_to_strength[(cue, response)] = max(
-                    0,
-                    math.log2(
-                        self.get_relative_probability(cue, response)
-                        * num_cues
-                        / denominator
-                    ),
-                )
+                denominator=0
+                if self.use_ppmi:
+                    for cue_i in self.responses_to_cues[response]:
+                        denominator += self.get_relative_probability(cue_i, response)
+                    pairs_to_strength[(cue, response)] = max(
+                        0,
+                        math.log2(
+                            self.get_relative_probability(cue, response)
+                            * num_cues
+                            / denominator
+                        ),
+                    )
+                else:
+                    pairs_to_strength[(cue, response)] = self.get_relative_probability(
+                        cue, response
+                    )
         return pairs_to_strength, cues_to_index, responses
 
     def read_in_strengths(self):
@@ -156,7 +162,9 @@ class SWOWInterface:
                         + "\t"
                         + str(self.cue_response_count[cue]["#Total_Count#"])
                         + "\t"
-                        + str(self.association_strength_matrix[cue_index,response_index])
+                        + str(
+                            self.association_strength_matrix[cue_index, response_index]
+                        )
                         + "\n"
                     )
 
@@ -207,8 +215,14 @@ class SWOWInterface:
 
     def get_weighted_neighbours(self, token):
         neighbours = self.get_candidate_set(token)
+        total_strength = np.array(
+            [
+                self.get_association_strength("star", candidate)
+                for candidate in self.get_candidate_set("star")
+            ]
+        ).sum()
         return {
-            neighbour: self.get_association_strength(token, neighbour)
+            neighbour: self.get_association_strength(token, neighbour) / total_strength
             for neighbour in neighbours
         }
 
