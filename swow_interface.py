@@ -2,28 +2,31 @@ import pandas as pd
 import os
 import numpy as np
 from nltk.corpus import stopwords
+import math
 import time
 from tqdm import tqdm
 import re
 
 
 class SWOWInterface:
-    def __init__(self, number_of_responses):
+    def __init__(self, number_of_responses, strength_file=None):
         self.work_dir = "/projekte/semrel/WORK-AREA/Users/navid/SWOW-EN18"
-        self.strength_file = (
-            "strength.SWOW-EN.R1.20180827.csv"
-            if number_of_responses < 3
-            else "strength.SWOW-EN.R123.20180827.csv"
-        )
+        self.strength_file = strength_file
         self.response_file = "SWOW-EN.complete.20180827.csv"
         self.stops = stopwords.words("english")
         self.num_responses = number_of_responses
-        self.cues_to_responses, self.responses_to_cues = self.init_response_table()
+        if self.strength_file:
+            self.cues_to_responses, self.responses_to_cues = self.init_response_table()
+        else:
+            self.cues_to_responses, self.responses_to_cues, self.cue_response_count = (
+                self.init_response_table()
+            )
         (
             self.association_strength_matrix,
             self.cue_indices,
             self.response_indices,
         ) = self.init_strength_table()
+
         self.combined_cue_response_indices = {
             token: indices[token]
             for indices in [self.cue_indices, self.response_indices]
@@ -34,6 +37,8 @@ class SWOWInterface:
         space_regex = re.compile(f"\\s")
         cues_to_responses = dict()
         responses_to_cues = dict()
+        if not self.strength_file:
+            cue_response_amounts = dict()
         with open(
             os.path.join(self.work_dir, self.response_file), "r", encoding="utf-8"
         ) as assocs:
@@ -42,29 +47,62 @@ class SWOWInterface:
                 values = [item.strip()[1:-1] for item in line.split(",")]
                 if len(values) != 18:
                     continue
-                if values[11] in cues_to_responses:
-                    cues_to_responses[values[11]] += [
-                        re.sub(space_regex, "_", values[15 + i])
-                        for i in range(self.num_responses)
-                    ]
+                cue = re.sub(space_regex, "_", values[11])
+                responses = [
+                    re.sub(space_regex, "_", values[15 + i])
+                    for i in range(self.num_responses)
+                    if values[15 + i] != "No more responses"
+                    and values[15 + i] != "Unknown word"
+                ]
+                if len(responses) == 0:
+                    continue
+                if cue in cues_to_responses:
+                    cues_to_responses[cue].update(responses)
                 else:
-                    cues_to_responses[values[11]] = [
-                        re.sub(space_regex, "_", values[15 + i])
-                        for i in range(self.num_responses)
-                    ]
-                for i in range(self.num_responses):
-                    if values[15 + i] in responses_to_cues:
-                        responses_to_cues[values[15 + i]].append(
-                            re.sub(space_regex, "_", values[11])
-                        )
+                    cues_to_responses[cue] = set(responses)
+                if not self.strength_file:
+                    if not cue in cue_response_amounts:
+                        cue_response_amounts[cue] = {"#Total_Count#": 0}
+                for response in responses:
+                    if response in responses_to_cues:
+                        responses_to_cues[response].add(cue)
                     else:
-                        responses_to_cues[values[15 + i]] = [
-                            re.sub(space_regex, "_", values[11])
-                        ]
-
+                        responses_to_cues[response] = set([cue])
+                    if not self.strength_file:
+                        cue_response_amounts[cue]["#Total_Count#"] += 1
+                        if response in cue_response_amounts[cue]:
+                            cue_response_amounts[cue][response] += 1
+                        else:
+                            cue_response_amounts[cue][response] = 1
+        if not self.strength_file:
+            return (cues_to_responses, responses_to_cues, cue_response_amounts)
         return (cues_to_responses, responses_to_cues)
 
-    def init_strength_table(self):
+    def calculate_strengths(self):
+        cues_to_index = dict()
+        responses = set()
+        pairs_to_strength = dict()
+        for i, cue in enumerate(self.cue_response_count):
+            num_cues = len(self.cues_to_responses)
+            cues_to_index[cue] = i
+            for response in self.cue_response_count[cue]:
+                if response == "#Total_Count#":
+                    continue
+                responses.add(response)
+                denominator = 0
+                for cue_i in self.responses_to_cues[response]:
+                    denominator += self.get_relative_probability(cue_i, response)
+                pairs_to_strength[(cue, response)] = max(
+                    0,
+                    math.log2(
+                        self.get_relative_probability(cue, response)
+                        * num_cues
+                        / denominator
+                    ),
+                )
+        return pairs_to_strength, cues_to_index, responses
+
+    def read_in_strengths(self):
         space_regex = re.compile(f"\\s")
         pairs_to_strength = dict()
         cue_to_index = dict()
@@ -87,6 +125,56 @@ class SWOWInterface:
                 if cue not in cue_to_index:
                     cue_to_index[cue] = len(cue_to_index)
                 responses.add(response)
+        return pairs_to_strength, cue_to_index, responses
+
+    def write_strengths_to_file(self, filepath):
+        with open(filepath, "w", encoding="utf-8") as output:
+            output.write(
+                "cue"
+                + "\t"
+                + "response"
+                + "\t"
+                + "R_Count"
+                + "\t"
+                + "N"
+                + "\t"
+                + "Strength"
+                + "\n"
+            )
+            for cue in self.cue_response_count:
+                for response in self.cue_response_count[cue]:
+                    if response == "#Total_Count#":
+                        continue
+                    cue_index = self.combined_cue_response_indices[cue]
+                    response_index = self.combined_cue_response_indices[response]
+                    output.write(
+                        str(cue)
+                        + "\t"
+                        + str(response)
+                        + "\t"
+                        + str(self.cue_response_count[cue][response])
+                        + "\t"
+                        + str(self.cue_response_count[cue]["#Total_Count#"])
+                        + "\t"
+                        + str(self.association_strength_matrix[cue_index,response_index])
+                        + "\n"
+                    )
+
+    def get_relative_probability(self, cue, response):
+        if not cue in self.cue_response_count:
+            raise KeyError(f"{cue} not in dictionary")
+        if not response in self.cue_response_count[cue]:
+            raise KeyError(f"{response} not in dictionary")
+        return (
+            self.cue_response_count[cue][response]
+            / self.cue_response_count[cue]["#Total_Count#"]
+        )
+
+    def init_strength_table(self):
+        if not self.strength_file:
+            pairs_to_strength, cue_to_index, responses = self.calculate_strengths()
+        else:
+            pairs_to_strength, cue_to_index, responses = self.read_in_strengths()
         responses.difference_update(cue_to_index.keys())
         num_cues = len(cue_to_index)
         response_to_index = {
