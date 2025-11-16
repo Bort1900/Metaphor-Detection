@@ -207,6 +207,13 @@ class NThresholdModel:
             print(f"Current Thresholds: {self.decision_thresholds}")
 
     def evaluate_per_threshold(self, start, steps, increment, save_file):
+        """
+        writes some evaluation metrics into a file after evaluating the model with different thresholds
+        start: the first threshold to test
+        steps: the number of thresholds to test
+        increment: the difference between two thresholds to test
+        save_file: where to store the results
+        """
         if self.num_classes > 2:
             raise ValueError("only works for 2 classes")
         self.decision_thresholds = [start]
@@ -232,6 +239,9 @@ class MaoModel(NThresholdModel):
         embeddings,
         use_output_vec,
     ):
+        """
+        Model that works like the model from the Mao(2018) paper, see NThresholdModel
+        """
         super().__init__(
             dev_data=dev_data,
             test_data=test_data,
@@ -279,6 +289,9 @@ class MaoModel(NThresholdModel):
                 print(alternating_counter)
 
     def optimize_threshold(self, max_epochs=100):
+        '''
+        deprecated
+        '''
         increment = 0.1
         self.decision_threshold = 0
         direction = 1  # 1:upwards, -1 downwards
@@ -305,6 +318,9 @@ class MaoModel(NThresholdModel):
             i += 1
 
     def find_best_threshold(self, steps):
+        '''
+        deprecated
+        '''
         self.decision_threshold = 0
         best_threshold = 0
         best_f_score = 0
