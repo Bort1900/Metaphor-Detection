@@ -13,9 +13,17 @@ from transformers import BertModel, BertTokenizer
 
 class Embeddings:
     def __init__(self):
+        """
+        Class to create embeddings for tokens
+        """
         pass
 
     def get_mean_vector(self, tokens, use_input_vecs=True):
+        """
+        returns the mean pooled embeddings for a list of tokens
+        tokens: list of tokens whose embeddings are mean pooled
+        use_input_vecs: whether to use input or output vectors
+        """
         if use_input_vecs:
             embeddings = []
             for token in tokens:
@@ -30,23 +38,43 @@ class Embeddings:
         return np.mean(embeddings, axis=0)
 
     def get_input_vector(self, token):
+        """
+        returns the standard embeddings
+        token: token for which embeddings are returned
+        """
         return token
 
     def get_output_vector(self, token):
+        """
+        returns the output embeddings(word2vec) if available
+        token: token for which embeddings are returned
+        """
         return token
 
 
 class FasttextModel(Embeddings):
     def __init__(self, load_file):
+        """
+        Wrapper for Fasttext embeddings
+        load_file: filepath where model is stored
+        """
         self.model = fasttext.load_model(load_file)
         self.load_file = load_file
         self.output_matrix = self.model.get_output_matrix()
         self.wn_interface = WordNetInterface(use_pos="")
 
     def get_input_vector(self, token):
+        """
+        returns fasttext word embedding
+        token: word for which embedding is given
+        """
         return self.model.get_word_vector(token)
 
     def get_output_vector(self, token):
+        """
+        returns the fasttext output embeddings if available (mean pooling from synonyms,hypernyms if unseen word)
+        token: word for which embeddings is given
+        """
         word_id = self.model.get_word_id(token)
         if word_id == -1:
             spare_candidates = [
@@ -77,6 +105,12 @@ class FasttextModel(Embeddings):
 
 class WordAssociationEmbeddings(Embeddings):
     def __init__(self, swow, index_file, embedding_file):
+        """
+        Class for graph embeddings for Word Association strength graph
+        swow: SWOWInterface instance that is used for creating the embeddings
+        index_file: where the cue and response indices are loaded from
+        embedding_file: where the embedding matrix is loaded from
+        """
         self.swow = swow
         self.load(index_file, embedding_file)
         self.mean_vector = np.mean(self.embeddings, axis=0)
@@ -90,6 +124,15 @@ class WordAssociationEmbeddings(Embeddings):
         alpha=0.75,
         dimensions=-1,
     ):
+        """
+        returns and writes graph embeddings that are created for a given Word association strength graph
+        index_file: where the cue and response indices will be stored
+        embedding_file: where the embeddings will be stored
+        use_only_cues: if True it will calculate the graph embeddings for only the cue data omitting the responses due to long calculation time,
+        if False it will give out sparse embeddings from the original strength matrix
+        alpha: decay factor representing how much the weight of a connection will diminish with the nodes between them
+        dimensions: number of dimensions the embeddings will be projected to, if -1 dimensions will be number of cues/cues + responses
+        """
         matrix, indices = swow.get_association_strength_matrix(
             use_only_cues=use_only_cues
         )
@@ -109,6 +152,11 @@ class WordAssociationEmbeddings(Embeddings):
         )
 
     def load(self, index_file, embedding_file):
+        """
+        loads the embeddings from save files
+        index_file: where the cue and response indices are loaded from
+        embedding_file: where the embedding matrix is loaded from
+        """
         self.indices = dict()
         with open(index_file, "r", encoding="utf-8") as input:
             for i, line in enumerate(input):
@@ -116,6 +164,10 @@ class WordAssociationEmbeddings(Embeddings):
         self.embeddings = np.load(embedding_file)
 
     def get_input_vector(self, token):
+        """
+        returns embedding for a given cue from the association strength matrix (mean pooling from neighbours if response and only cues are used)
+        token: the cue for which embedding is given
+        """
         if token in self.indices:
             token_index = self.indices[token]
             return self.embeddings[token_index]
@@ -139,6 +191,10 @@ class WordAssociationEmbeddings(Embeddings):
 
 class BertEmbeddings(Embeddings):
     def __init__(self, layer):
+        """
+        Wrapper for Bert Embeddings
+        layer: which layer(s) of the hidden layers to use as embeddings
+        """
         self.layer = layer
         self.model = BertModel.from_pretrained(
             "bert-base-uncased",
@@ -151,6 +207,10 @@ class BertEmbeddings(Embeddings):
         self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
 
     def get_input_vector(self, sentence):
+        """
+        returns contextual Bert embedding for the sentence target
+        sentence: Sentence instance for whose target the embedding is given
+        """
         tokenized = self.tokenizer(sentence.sentence, return_tensors="pt")
         if torch.cuda.is_available():
             tokenized.to("cuda")
@@ -167,6 +227,11 @@ class BertEmbeddings(Embeddings):
             return output.hidden_states[self.layer][0, sentence.target_index + 1]
 
     def get_mean_vector(self, sentence, use_input_vecs=True):
+        """
+        returns mean pooled embedding for words of a sentence
+        sentence: Sentence instance whose embeddings are mean pooled
+        use_input_vecs: irrelevant
+        """
         embeddings = []
         for token in sentence.tokens:
             token_sent = Sentence(
@@ -182,6 +247,10 @@ class BertEmbeddings(Embeddings):
         return torch.stack(embeddings).mean(dim=0)
 
     def get_context_vector(self, sentence):
+        """
+        returns mean pooled embedding for sentence context (sentence excluding target)
+        sentence: Sentence instance whose embeddings are mean pooled
+        """
         embeddings = []
         for i, token in enumerate(sentence.tokens):
             if i != sentence.target_index and token.lower() not in self.stops:
