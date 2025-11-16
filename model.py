@@ -241,6 +241,12 @@ class MaoModel(NThresholdModel):
     ):
         """
         Model that works like the model from the Mao(2018) paper, see NThresholdModel
+        dev_data: list of Sentence instances to train thresholds
+        test_data: list of Sentence instances to evaluate model
+        candidate_source: an object with a get_candidate_set function
+        mean_multi_word: whether embeddings for multi-word tokens should be mean pooled from the embeddings of the individual words
+        embeddings: source for embeddings for comparing
+        use_output_vec: whether ouput vectors(word2vec) should be used for comparing context to candidates
         """
         super().__init__(
             dev_data=dev_data,
@@ -289,9 +295,9 @@ class MaoModel(NThresholdModel):
                 print(alternating_counter)
 
     def optimize_threshold(self, max_epochs=100):
-        '''
+        """
         deprecated
-        '''
+        """
         increment = 0.1
         self.decision_threshold = 0
         direction = 1  # 1:upwards, -1 downwards
@@ -318,9 +324,9 @@ class MaoModel(NThresholdModel):
             i += 1
 
     def find_best_threshold(self, steps):
-        '''
+        """
         deprecated
-        '''
+        """
         self.decision_threshold = 0
         best_threshold = 0
         best_f_score = 0
@@ -344,6 +350,16 @@ class ContextualMaoModel(NThresholdModel):
         embeddings,
         num_classes=2,
     ):
+        """
+        like Mao Model but uses contextual embeddings
+        dev_data: list of Sentence instances to train thresholds
+        test_data: list of Sentence instances to evaluate model
+        candidate_source: an object with a get_candidate_set function
+        mean_multi_word: whether embeddings for multi-word tokens should be mean pooled from the embeddings of the individual words
+        embeddings: source for embeddings for comparing
+        use_output_vec: whether ouput vectors(word2vec) should be used for comparing context to candidates
+        num_classes: number of classes to classify
+        """
         super().__init__(
             dev_data=dev_data,
             test_data=test_data,
@@ -356,6 +372,10 @@ class ContextualMaoModel(NThresholdModel):
         self.cos = CosineSimilarity(dim=0, eps=1e-6)
 
     def best_fit(self, sentence):
+        """
+        returns the best candidate from the candidate set that fits into the sentence context
+        sentence: sentence that will be predicted
+        """
         candidate_set = self.candidate_source.get_candidate_set(sentence.target)
         candidate_set.add(sentence.target_token)
         best_similarity = -1
@@ -383,6 +403,10 @@ class ContextualMaoModel(NThresholdModel):
         return best_candidate
 
     def get_compare_value(self, sentence):
+        """
+        returns the value that is used to determine the prediction
+        sentence: Sentence instance that will be predicted
+        """
         predicted_sense = self.best_fit(sentence)
         comparison_target_sentence = Sentence(
             sentence=f"I associate {sentence.target} with {predicted_sense}.",
@@ -418,6 +442,11 @@ class ComparingModel(NThresholdModel):
     ):
         """
         model that compares literal and associative similarity and predicts metaphoricity with a threshold
+        dev_data: list of Sentence instances to train thresholds
+        test_data: list of Sentence instances to evaluate model
+        literal_embeddings: Semantic Embeddings for comparing
+        use_output_vec: whether ouput vectors(word2vec) should be used for comparing context to candidates
+        num_classes: number of classes to classify
         associative_embeddings: WordAssociationEmbeddings instance
         """
         super().__init__(
@@ -470,6 +499,13 @@ class ComparingModel(NThresholdModel):
         )
 
     def evaluate_per_threshold(self, start, steps, increment, save_file):
+        """
+        writes some evaluation metrics into a file after evaluating the model with different thresholds
+        start: the first threshold to test
+        steps: the number of thresholds to test
+        increment: the difference between two thresholds to test
+        save_file: where to store the results
+        """
         self.estimate_map_factor()
         return super().evaluate_per_threshold(start, steps, increment, save_file)
 
@@ -555,6 +591,14 @@ class RandomBaseline(MaoModel):
         candidate_source,
         embeddings,
     ):
+        """
+        Model that randomly choses a word from the candidate set to predict the class with a threshold
+        dev_data: list of Sentence instances to train thresholds
+        test_data: list of Sentence instances to evaluate model
+        candidate_source: an object with a get_candidate_set function
+        embeddings: source for embeddings for comparing
+
+        """
         super().__init__(
             dev_data=dev_data,
             test_data=test_data,
@@ -565,6 +609,10 @@ class RandomBaseline(MaoModel):
         )
 
     def best_fit(self, sentence):
+        """
+        returns random element from the candidate set
+        sentence: Sentence instance the model will predict
+        """
         candidate_set = self.candidate_source.get_candidate_set(sentence.target)
         candidate_set.add(sentence.target_token)
         return random.choice(list(candidate_set))
