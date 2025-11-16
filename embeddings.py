@@ -104,6 +104,9 @@ class WordAssociationEmbeddings(Embeddings):
             pca = PCA(n_components=dimensions)
             embeddings = pca.fit_transform(embeddings)
         np.save(embedding_file, embeddings)
+        return WordAssociationEmbeddings(
+            swow=swow, index_file=index_file, embedding_file=embedding_file
+        )
 
     def load(self, index_file, embedding_file):
         self.indices = dict()
