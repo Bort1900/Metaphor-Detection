@@ -3,6 +3,7 @@ from data import Vectors
 import numpy as np
 import time
 import torch
+from nltk.corpus import stopwords
 from torch.nn import CosineSimilarity
 from tqdm import tqdm
 from data import Sentence
@@ -38,6 +39,7 @@ class NThresholdModel:
         self.embeddings = embeddings
         self.decision_thresholds = [0.5 for i in range(num_classes - 1)]
         self.num_classes = num_classes
+        self.stops = stopwords.words("english")
 
     @staticmethod
     def calculate_scores(confusion_matrix):
@@ -138,7 +140,8 @@ class NThresholdModel:
         candidate_set = self.candidate_source.get_candidate_set(sentence.target)
         candidate_set.add(sentence.target_token)
         best_similarity = -1
-        context_vector = self.embeddings.get_mean_vector(sentence.context)
+        context = [word for word in sentence.context if word.lower() not in self.stops]
+        context_vector = self.embeddings.get_mean_vector(context)
         best_candidate = sentence.target
         for candidate in candidate_set:
             if self.use_output:
