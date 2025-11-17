@@ -348,6 +348,7 @@ class ContextualMaoModel(NThresholdModel):
         candidate_source,
         mean_multi_word,
         embeddings,
+        comparing_phrase,
         num_classes=2,
     ):
         """
@@ -358,6 +359,7 @@ class ContextualMaoModel(NThresholdModel):
         mean_multi_word: whether embeddings for multi-word tokens should be mean pooled from the embeddings of the individual words
         embeddings: source for embeddings for comparing
         use_output_vec: whether ouput vectors(word2vec) should be used for comparing context to candidates
+        comparing_phrase: Context to create candidate embeddings: '[Target] [comparing_phrase] [candidate]'
         num_classes: number of classes to classify
         """
         super().__init__(
@@ -369,6 +371,7 @@ class ContextualMaoModel(NThresholdModel):
             use_output_vec=False,
             num_classes=num_classes,
         )
+        self.comparing_phrase = comparing_phrase
         self.cos = CosineSimilarity(dim=0, eps=1e-6)
 
     def best_fit(self, sentence):
@@ -382,7 +385,9 @@ class ContextualMaoModel(NThresholdModel):
         context_vector = self.embeddings.get_context_vector(sentence)
         best_candidate = sentence.target
         comparison_sentence = Sentence(
-            sentence=f"I associate {sentence.target} with xyz", target="xyz", value=0
+            sentence=f"{sentence.target} {self.comparing_phrase} xyz.",
+            target="xyz",
+            value=0,
         )
         for candidate in candidate_set:
             try:
@@ -409,12 +414,12 @@ class ContextualMaoModel(NThresholdModel):
         """
         predicted_sense = self.best_fit(sentence)
         comparison_target_sentence = Sentence(
-            sentence=f"I associate {sentence.target} with {predicted_sense}.",
+            sentence=f"{sentence.target} {self.comparing_phrase} {predicted_sense}.",
             target=sentence.target,
             value=0,
         )
         comparison_candidate_sentence = Sentence(
-            sentence=f"I associate {sentence.target} with xyz.",
+            sentence=f"{sentence.target} {self.comparing_phrase} xyz.",
             target="xyz",
             value=0,
         )
