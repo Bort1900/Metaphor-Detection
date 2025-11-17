@@ -117,4 +117,7 @@ class Vectors:
         """
         simple cosine similarity function
         """
-        return float(np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2)))
+        denominator = np.linalg.norm(vec1) * np.linalg.norm(vec2)
+        if denominator == 0:
+            breakpoint()
+        return float(np.dot(vec1, vec2) / denominator)
