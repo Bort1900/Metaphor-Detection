@@ -190,12 +190,12 @@ class WordAssociationEmbeddings(Embeddings):
 
 
 class BertEmbeddings(Embeddings):
-    def __init__(self, layer):
+    def __init__(self, layers):
         """
         Wrapper for Bert Embeddings
-        layer: which layer(s) of the hidden layers to use as embeddings
+        layer: list of which layer(s) of the hidden layers to use as embeddings
         """
-        self.layer = layer
+        self.layers = layers
         self.model = BertModel.from_pretrained(
             "bert-base-uncased",
             output_hidden_states=True,
@@ -219,12 +219,18 @@ class BertEmbeddings(Embeddings):
         if type(sentence.target_index) != int:
             return torch.stack(
                 [
-                    output.hidden_states[self.layer][0, i + 1]
+                    output.hidden_states[layer][0, i + 1]
+                    for layer in self.layers
                     for i in sentence.target_index
                 ]
             ).mean(dim=0)
         else:
-            return output.hidden_states[self.layer][0, sentence.target_index + 1]
+            return torch.stack(
+                [
+                    output.hidden_states[layer][0, sentence.target_index + 1]
+                    for layer in self.layers
+                ]
+            ).mean(dim=0)
 
     def get_mean_vector(self, sentence, use_input_vecs=True):
         """
