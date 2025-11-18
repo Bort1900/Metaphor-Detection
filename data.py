@@ -9,7 +9,13 @@ import numpy as np
 
 
 class Sentence:
-    def __init__(self, sentence, target, value, phrase="unknown"):
+    def __init__(
+        self,
+        sentence,
+        target,
+        value,
+        phrase="unknown",
+    ):
         """
         A sentence containing a phrase that's either metaphorical or literal
         sentence: string of the sentence
@@ -30,7 +36,7 @@ class Sentence:
         else:
             # search for inflection of target
             for i, token in enumerate(self.tokens):
-                if target == wnl.lemmatize(token.lower(), pos="v"):
+                if target == wnl.lemmatize(token.lower()):
                     self.target_index = i
                     self.target_token = token.lower()
                     break

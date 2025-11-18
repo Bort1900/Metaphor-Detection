@@ -266,7 +266,6 @@ class BertEmbeddings(Embeddings):
                     value=sentence.value,
                     phrase=sentence.phrase,
                 )
-                print(token_sent.sentence, token_sent.target, token_sent.target_index)
                 try:
                     embeddings.append(self.get_input_vector(token_sent))
                 except KeyError:
