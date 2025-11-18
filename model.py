@@ -17,7 +17,8 @@ class NThresholdModel:
         test_data,
         candidate_source,
         mean_multi_word,
-        embeddings,
+        fit_embeddings,
+        score_embeddings,
         use_output_vec,
         num_classes=2,
     ):
@@ -27,7 +28,8 @@ class NThresholdModel:
         test_data: list of Sentence instances to evaluate model
         candidate_source: an object with a get_candidate_set function
         mean_multi_word: whether embeddings for multi-word tokens should be mean pooled from the embeddings of the individual words
-        embeddings: source for embeddings for comparing
+        fit_embeddings: source for embeddings for finding best fit candidate
+        score_embeddings: source for embeddings for scoring for prediction
         use_output_vec: whether ouput vectors(word2vec) should be used for comparing context to candidates
         num_classes: number of classes to classify
         """
@@ -36,7 +38,8 @@ class NThresholdModel:
         self.candidate_source = candidate_source
         self.mean_multi_word = mean_multi_word
         self.use_output = use_output_vec
-        self.embeddings = embeddings
+        self.fit_embeddings = fit_embeddings
+        self.score_embeddings = score_embeddings
         self.decision_thresholds = [0.5 for i in range(num_classes - 1)]
         self.num_classes = num_classes
         self.stops = stopwords.words("english")
@@ -126,8 +129,8 @@ class NThresholdModel:
         """
         predicted_sense = self.best_fit(sentence)
         try:
-            target_vector = self.embeddings.get_input_vector(sentence.target)
-            predicted_vector = self.embeddings.get_input_vector(predicted_sense)
+            target_vector = self.score_embeddings.get_input_vector(sentence.target)
+            predicted_vector = self.score_embeddings.get_input_vector(predicted_sense)
         except KeyError:
             raise ValueError(f"{sentence.target} not in dictionary")
         return Vectors.cos_sim(target_vector, predicted_vector)
@@ -141,28 +144,32 @@ class NThresholdModel:
         candidate_set.add(sentence.target_token)
         best_similarity = -1
         context = [word for word in sentence.context if word.lower() not in self.stops]
-        context_vector = self.embeddings.get_mean_vector(context)
+        context_vector = self.fit_embeddings.get_mean_vector(context)
         best_candidate = sentence.target
         for candidate in candidate_set:
             if self.use_output:
                 try:
                     if len(candidate.split("_")) > 1 and self.mean_multi_word:
-                        candidate_vector = self.embeddings.get_mean_vector(
+                        candidate_vector = self.fit_embeddings.get_mean_vector(
                             tokens=candidate.split("_"), use_input_vecs=False
                         )
                     else:
-                        candidate_vector = self.embeddings.get_output_vector(candidate)
+                        candidate_vector = self.fit_embeddings.get_output_vector(
+                            candidate
+                        )
                 except ValueError:
                     # print(f"Word {candidate} not in dictionary, ignoring candidate")
                     continue
             else:
                 try:
                     if len(candidate.split("_")) > 1 and self.mean_multi_word:
-                        candidate_vector = self.embeddings.get_mean_vector(
+                        candidate_vector = self.fit_embeddings.get_mean_vector(
                             tokens=candidate.split("_"), use_input_vecs=True
                         )
                     else:
-                        candidate_vector = self.embeddings.get_input_vector(candidate)
+                        candidate_vector = self.fit_embeddings.get_input_vector(
+                            candidate
+                        )
                 except KeyError:
                     # print(f"Word {candidate} not in dictionary, ignoring candidate")
                     continue
@@ -236,7 +243,8 @@ class MaoModel(NThresholdModel):
         test_data,
         candidate_source,
         mean_multi_word,
-        embeddings,
+        fit_embeddings,
+        score_embeddings,
         use_output_vec,
     ):
         """
@@ -245,7 +253,8 @@ class MaoModel(NThresholdModel):
         test_data: list of Sentence instances to evaluate model
         candidate_source: an object with a get_candidate_set function
         mean_multi_word: whether embeddings for multi-word tokens should be mean pooled from the embeddings of the individual words
-        embeddings: source for embeddings for comparing
+        fit_embeddings: source for embeddings for finding best fit candidate
+        score_embeddings: source for embeddings for scoring for prediction
         use_output_vec: whether ouput vectors(word2vec) should be used for comparing context to candidates
         """
         super().__init__(
@@ -253,7 +262,8 @@ class MaoModel(NThresholdModel):
             test_data=test_data,
             candidate_source=candidate_source,
             mean_multi_word=mean_multi_word,
-            embeddings=embeddings,
+            fit_embeddings=fit_embeddings,
+            score_embeddings=score_embeddings,
             use_output_vec=use_output_vec,
         )
 
@@ -347,7 +357,8 @@ class ContextualMaoModel(NThresholdModel):
         test_data,
         candidate_source,
         mean_multi_word,
-        embeddings,
+        fit_embeddings,
+        score_embeddings,
         comparing_phrase,
         num_classes=2,
     ):
@@ -367,7 +378,8 @@ class ContextualMaoModel(NThresholdModel):
             test_data=test_data,
             candidate_source=candidate_source,
             mean_multi_word=mean_multi_word,
-            embeddings=embeddings,
+            fit_embeddings=fit_embeddings,
+            score_embeddings=score_embeddings,
             use_output_vec=False,
             num_classes=num_classes,
         )
@@ -382,7 +394,7 @@ class ContextualMaoModel(NThresholdModel):
         candidate_set = self.candidate_source.get_candidate_set(sentence.target)
         candidate_set.add(sentence.target_token)
         best_similarity = -1
-        context_vector = self.embeddings.get_context_vector(sentence)
+        context_vector = self.fit_embeddings.get_context_vector(sentence)
         best_candidate = sentence.target
         comparison_sentence = Sentence(
             sentence=f"{sentence.target} {self.comparing_phrase} xyz.",
@@ -397,11 +409,9 @@ class ContextualMaoModel(NThresholdModel):
                     target_index=comparison_sentence.target_index,
                 )
             except:
-                breakpoint()
-            print(new_sent.sentence, new_sent.target, new_sent.target_index)
-            candidate_vector = self.embeddings.get_input_vector(new_sent)
+                continue
+            candidate_vector = self.fit_embeddings.get_input_vector(new_sent)
             similarity = self.cos(candidate_vector, context_vector)
-            print(similarity)
             if similarity >= best_similarity:
                 best_similarity = similarity
                 best_candidate = candidate
@@ -428,8 +438,10 @@ class ContextualMaoModel(NThresholdModel):
             split_multi_word=self.mean_multi_word,
             target_index=comparison_candidate_sentence.target_index,
         )
-        target_vector = self.embeddings.get_input_vector(comparison_target_sentence)
-        predicted_vector = self.embeddings.get_input_vector(
+        target_vector = self.score_embeddings.get_input_vector(
+            comparison_target_sentence
+        )
+        predicted_vector = self.score_embeddings.get_input_vector(
             comparison_candidate_sentence
         )
         return self.cos(target_vector, predicted_vector)
@@ -459,11 +471,12 @@ class ComparingModel(NThresholdModel):
             test_data=test_data,
             candidate_source=None,
             mean_multi_word=None,
-            embeddings=literal_embeddings,
+            fit_embeddings=literal_embeddings,
+            score_embeddings=associative_embeddings,
             use_output_vec=use_output_vec,
             num_classes=num_classes,
         )
-        self.literal_embeddings = self.embeddings
+        self.literal_embeddings = literal_embeddings
         self.associative_embeddings = associative_embeddings
         self.map_factor = 1  # mapping the size of one embedding space to the other for linear transform
 
@@ -545,9 +558,6 @@ class ComparingModel(NThresholdModel):
         self.map_factor = (largest_associative - smallest_associative) / (
             largest_literal - smallest_literal
         )
-        print(
-            largest_associative, smallest_associative, largest_literal, smallest_literal
-        )
         print(f"ignored {ignore_count} of {len(self.dev_data)} sentences")
         print(f"mapping factor: {self.map_factor}")
 
@@ -594,7 +604,7 @@ class RandomBaseline(MaoModel):
         dev_data,
         test_data,
         candidate_source,
-        embeddings,
+        score_embeddings,
     ):
         """
         Model that randomly choses a word from the candidate set to predict the class with a threshold
@@ -609,7 +619,8 @@ class RandomBaseline(MaoModel):
             test_data=test_data,
             candidate_source=candidate_source,
             mean_multi_word=False,
-            embeddings=embeddings,
+            score_embeddings=score_embeddings,
+            fit_embeddings=score_embeddings,
             use_output_vec=False,
         )
 
