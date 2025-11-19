@@ -8,6 +8,7 @@ from torch.nn import CosineSimilarity
 from tqdm import tqdm
 from data import Sentence
 import math
+import matplotlib.pyplot as plt
 
 
 class NThresholdModel:
@@ -234,6 +235,23 @@ class NThresholdModel:
                     f"{round(self.decision_thresholds[0],2)}\t{round(scores["precision_class_0"],2)}\t{round(scores["recall_class_0"],2)}\t{round(scores["f_1_class_0"],2)}\t{round(scores["f_1_class_1"],2)}\t{round(scores["macro_f_1"],2)}\n"
                 )
                 self.decision_thresholds[0] += increment
+
+    def draw_distribution_per_class(self, save_file, labels, title):
+        """
+        draws box plots of the distributions of the prediction scores for each of the classes
+        save_file: where the plots are stored
+        """
+        datapoints = [[] for _ in range(self.num_classes)]
+        for sent in self.test_data:
+            try:
+                similarity = self.get_compare_value(sent)
+            except ValueError:
+                continue
+            datapoints[sent.value].append(similarity)
+        plt.boxplot(datapoints, labels=labels, orientation="horizontal")
+        plt.title(title)
+        plt.savefig(save_file, bbox_inches="tight")
+        plt.close()
 
 
 class MaoModel(NThresholdModel):
