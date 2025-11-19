@@ -616,13 +616,9 @@ class ComparingModel(NThresholdModel):
             print(f"Current Thresholds: {self.decision_thresholds}")
 
 
-class RandomBaseline(MaoModel):
+class RandomBaseline(NThresholdModel):
     def __init__(
-        self,
-        dev_data,
-        test_data,
-        candidate_source,
-        score_embeddings,
+        self, dev_data, test_data, candidate_source, score_embeddings, num_classes=2
     ):
         """
         Model that randomly choses a word from the candidate set to predict the class with a threshold
@@ -630,6 +626,7 @@ class RandomBaseline(MaoModel):
         test_data: list of Sentence instances to evaluate model
         candidate_source: an object with a get_candidate_set function
         embeddings: source for embeddings for comparing
+        num_classes: number of classes for prediction
 
         """
         super().__init__(
@@ -640,6 +637,7 @@ class RandomBaseline(MaoModel):
             score_embeddings=score_embeddings,
             fit_embeddings=score_embeddings,
             use_output_vec=False,
+            num_classes=num_classes,
         )
 
     def best_fit(self, sentence):
