@@ -5,4 +5,5 @@
 *.csv
 *.npy
 *.tsv
+model_distributions
 __pycache__
