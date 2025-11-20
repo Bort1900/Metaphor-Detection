@@ -109,9 +109,11 @@ class NThresholdModel:
         print(f"ignored {ignore_count} sentences of {len(data)}")
         scores = NThresholdModel.calculate_scores(confusion_matrix=confusion_matrix)
         if save_file:
-            with open(save_file,"w",encoding="utf-8") as output:
-                output.write("Decision thresholds: "+ self.decision_thresholds+"\n")
-                output.write(scores)
+            with open(save_file, "w", encoding="utf-8") as output:
+                output.write(
+                    "Decision thresholds: " + str(self.decision_thresholds)[1:-1] + "\n"
+                )
+                output.write(str(scores))
         return scores
 
     def predict(self, sentence):
