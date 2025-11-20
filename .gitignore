@@ -6,4 +6,5 @@
 *.npy
 *.tsv
 model_distributions
+model_evaluations
 __pycache__
