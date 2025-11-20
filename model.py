@@ -90,7 +90,7 @@ class NThresholdModel:
         )
         return scores
 
-    def evaluate(self, data):
+    def evaluate(self, data, save_file=None):
         """
         returns a dictionary of recall, precision and f-score metrics after evaluating the model on test data
         data: test data for evaluation
@@ -108,6 +108,10 @@ class NThresholdModel:
         print(confusion_matrix)
         print(f"ignored {ignore_count} sentences of {len(data)}")
         scores = NThresholdModel.calculate_scores(confusion_matrix=confusion_matrix)
+        if save_file:
+            with open(save_file,"w",encoding="utf-8") as output:
+                output.write("Decision thresholds: "+ self.decision_thresholds+"\n")
+                output.write(scores)
         return scores
 
     def predict(self, sentence):
