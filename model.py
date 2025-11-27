@@ -14,8 +14,7 @@ import matplotlib.pyplot as plt
 class NThresholdModel:
     def __init__(
         self,
-        dev_data,
-        test_data,
+        data,
         candidate_source,
         mean_multi_word,
         fit_embeddings,
@@ -26,8 +25,7 @@ class NThresholdModel:
     ):
         """
         Model that categorizes Sentence data in n classes based on n-1 thresholds and uses a candidate set for getting the value
-        :param dev_data: list of Sentence instances to train thresholds
-        :param test_data: list of Sentence instances to evaluate model
+        :param data: list of Sentence instances to train thresholds and evaluate model
         :param candidate_source: an object with a get_candidate_set function
         :param mean_multi_word: whether embeddings for multi-word tokens should be mean pooled from the embeddings of the individual words
         :param fit_embeddings: source for embeddings for finding best fit candidate
@@ -36,8 +34,10 @@ class NThresholdModel:
         :param restrict_pos: wether candidate sets should be retricted by target part of speech
         :param num_classes: number of classes to classify
         """
-        self.dev_data = dev_data
-        self.test_data = test_data
+        self.data = data
+        split = self.data.get_splits(splits=[0, 0.1, 0.9])
+        self.dev_data = split[1]
+        self.test_data = split[2]
         self.candidate_source = candidate_source
         self.mean_multi_word = mean_multi_word
         self.use_output = use_output_vec
@@ -268,8 +268,7 @@ class NThresholdModel:
 class MaoModel(NThresholdModel):
     def __init__(
         self,
-        dev_data,
-        test_data,
+        data,
         candidate_source,
         mean_multi_word,
         fit_embeddings,
@@ -279,8 +278,7 @@ class MaoModel(NThresholdModel):
     ):
         """
         Model that works like the model from the Mao(2018) paper, see NThresholdModel
-        :param dev_data: list of Sentence instances to train thresholds
-        :param test_data: list of Sentence instances to evaluate model
+        :param data: list of Sentence instances to train thresholds and evaluate model
         :param candidate_source: an object with a get_candidate_set function
         :param mean_multi_word: whether embeddings for multi-word tokens should be mean pooled from the embeddings of the individual words
         :param fit_embeddings: source for embeddings for finding best fit candidate
@@ -289,8 +287,7 @@ class MaoModel(NThresholdModel):
         :param use_output_vec: whether ouput vectors(word2vec) should be used for comparing context to candidates
         """
         super().__init__(
-            dev_data=dev_data,
-            test_data=test_data,
+            data=data,
             candidate_source=candidate_source,
             mean_multi_word=mean_multi_word,
             fit_embeddings=fit_embeddings,
@@ -385,8 +382,7 @@ class MaoModel(NThresholdModel):
 class ContextualMaoModel(NThresholdModel):
     def __init__(
         self,
-        dev_data,
-        test_data,
+        data,
         candidate_source,
         mean_multi_word,
         fit_embeddings,
@@ -397,8 +393,7 @@ class ContextualMaoModel(NThresholdModel):
     ):
         """
         like Mao Model but uses contextual embeddings
-        :param dev_data: list of Sentence instances to train thresholds
-        :param test_data: list of Sentence instances to evaluate model
+        :param data: list of Sentence instances to train thresholds and evaluate model
         :param candidate_source: an object with a get_candidate_set function
         :param mean_multi_word: whether embeddings for multi-word tokens should be mean pooled from the embeddings of the individual words
         :param embeddings: source for embeddings for comparing
@@ -408,8 +403,7 @@ class ContextualMaoModel(NThresholdModel):
         :param num_classes: number of classes to classify
         """
         super().__init__(
-            dev_data=dev_data,
-            test_data=test_data,
+            data=data,
             candidate_source=candidate_source,
             mean_multi_word=mean_multi_word,
             fit_embeddings=fit_embeddings,
@@ -487,8 +481,7 @@ class ContextualMaoModel(NThresholdModel):
 class ComparingModel(NThresholdModel):
     def __init__(
         self,
-        dev_data,
-        test_data,
+        data,
         literal_embeddings,
         associative_embeddings,
         use_output_vec,
@@ -496,16 +489,14 @@ class ComparingModel(NThresholdModel):
     ):
         """
         model that compares literal and associative similarity and predicts metaphoricity with a threshold
-        :param dev_data: list of Sentence instances to train thresholds
-        :param test_data: list of Sentence instances to evaluate model
+        :param data: list of Sentence instances to train thresholds and evaluate model
         :param literal_embeddings: Semantic Embeddings for comparing
         :param use_output_vec: whether ouput vectors(word2vec) should be used for comparing context to candidates
         :param num_classes: number of classes to classify
         :param associative_embeddings: WordAssociationEmbeddings instance
         """
         super().__init__(
-            dev_data=dev_data,
-            test_data=test_data,
+            data=data,
             candidate_source=None,
             mean_multi_word=None,
             fit_embeddings=literal_embeddings,
@@ -639,8 +630,7 @@ class ComparingModel(NThresholdModel):
 class RandomBaseline(NThresholdModel):
     def __init__(
         self,
-        dev_data,
-        test_data,
+        data,
         candidate_source,
         score_embeddings,
         restrict_pos,
@@ -648,16 +638,14 @@ class RandomBaseline(NThresholdModel):
     ):
         """
         Model that randomly choses a word from the candidate set to predict the class with a threshold
-        :param dev_data: list of Sentence instances to train thresholds
-        :param test_data: list of Sentence instances to evaluate model
+        :param data: list of Sentence instances to train thresholds and evaluate model
         :param candidate_source: an object with a get_candidate_set function
         :param embeddings: source for embeddings for comparing
         :param restrict_pos: wether candidate sets should be retricted by target part of speech
         :param num_classes: number of classes for prediction
         """
         super().__init__(
-            dev_data=dev_data,
-            test_data=test_data,
+            data=data,
             candidate_source=candidate_source,
             mean_multi_word=False,
             score_embeddings=score_embeddings,
