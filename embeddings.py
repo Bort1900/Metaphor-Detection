@@ -61,7 +61,7 @@ class FasttextModel(Embeddings):
         self.model = fasttext.load_model(load_file)
         self.load_file = load_file
         self.output_matrix = self.model.get_output_matrix()
-        self.wn_interface = WordNetInterface(use_pos="")
+        self.wn_interface = WordNetInterface()
 
     def get_input_vector(self, token):
         """
