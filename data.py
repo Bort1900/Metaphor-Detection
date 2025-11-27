@@ -9,25 +9,21 @@ import numpy as np
 
 
 class Sentence:
-    def __init__(
-        self,
-        sentence,
-        target,
-        value,
-        phrase="unknown",
-    ):
+    def __init__(self, sentence, target, value, phrase="unknown", pos=None):
         """
         A sentence containing a phrase that's either metaphorical or literal
         sentence: string of the sentence
-        target: the token or its lemma which is the target for the label
-        value: the label, 0: figurative, 1: literal, can also be 0: figurative, 1:unsure, 2:literal
-        phrase: the phrase containing the target if known
+        :param target: the token or its lemma which is the target for the label
+        :param value: the label, 0: figurative, 1: literal, can also be 0: figurative, 1:unsure, 2:literal
+        :param phrase: the phrase containing the target if known
+        :param pos: the part of speech of the target word if known
         """
         self.sentence = sentence
         self.tokens = word_tokenize(sentence)
         self.target = target
         self.value = value
         self.phrase = phrase
+        self.pos = pos
         wnl = WordNetLemmatizer()
         self.target_index = -1
         if target in self.tokens:
