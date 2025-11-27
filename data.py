@@ -82,19 +82,21 @@ class Sentence:
 
 
 class DataSet:
-    def __init__(self, filepath, extraction_function, use_unsure):
+    def __init__(self, filepath, extraction_function, use_unsure, seed=None):
         """
         A set of sentences
-        filepath: where the data that will be converted to Sentences is stored
-        extraction_function: function that specifically extracts Sentence instances from the provided datafile must have the use_unsure parameter
-        use_unsure: parameter for the extraction_function that specifies wether the Sentence values are binary or have a third "unsure" bin
+        :param filepath: where the data that will be converted to Sentences is stored
+        :param extraction_function: function that specifically extracts Sentence instances from the provided datafile must have the use_unsure parameter
+        :param use_unsure: parameter for the extraction_function that specifies wether the Sentence values are binary or have a third "unsure" bin
+        :param seed: if specified the seed for generating the random split
         """
         self.sentences = extraction_function(filepath, use_unsure)
+        self.seed = seed
 
     def get_splits(self, splits):
         """
         returns train, dev and test splits of the data as a list of three lists
-        splits: list of 3 values for train, dev and test split proportion in that order
+        :param splits: list of 3 values for train, dev and test split proportion in that order
         """
         if len(splits) != 3:
             raise ValueError(
@@ -105,6 +107,8 @@ class DataSet:
         num_train = math.floor(len(self.sentences) * splits[0])
         num_dev = math.floor(len(self.sentences) * splits[1])
         num_test = math.floor(len(self.sentences) * splits[2])
+        if self.seed:
+            random.seed(self.seed)
         partitions = random.sample(self.sentences, k=num_train + num_dev + num_test)
         return (
             partitions[:num_train],
