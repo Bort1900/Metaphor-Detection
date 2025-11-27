@@ -5,15 +5,20 @@ from nltk.corpus import wordnet as wn
 
 
 class WordNetInterface:
-    def __init__(self, use_pos):
+    def __init__(self):
         # self.work_dir = "/resources/data/WordNet/WordNet-3.0_extract"
         # self.token_to_synset_ids, self.synset_id_to_token, self.hypernym_synsets = (
         #    self.init_index_tables()
         # )
+        """
+        Interface from getting the candidate sets from wordnet synonyms and hypernyms
+        """
         self.stops = stopwords.words("english")
-        self.pos = use_pos
 
     def init_index_tables(self):
+        """
+        deprecated
+        """
         # token to synset tables
         nouns = pd.read_csv(
             os.path.join(self.work_dir, "noun-synsets.txt"),
@@ -83,6 +88,9 @@ class WordNetInterface:
         return token_to_synset, synset_to_token, hypernyms
 
     def get_synset_ids(self, token, pos):
+        """
+        deprecated
+        """
         return (
             self.token_to_synset_ids[
                 (self.token_to_synset_ids["token"] == token)
@@ -93,17 +101,24 @@ class WordNetInterface:
         )
 
     def get_tokens_from_id(self, id, pos):
+        """
+        deprecated
+        """
         return self.synset_id_to_token[
             (self.synset_id_to_token["id"] == id)
             & (self.synset_id_to_token["POS"] == pos)
         ].iloc[0]["tokens"]
 
-    def get_synonyms(self, token):
+    def get_synonyms(self, token, pos=None):
+        """
+        gets all the synonymic synsets from wordnet and returns a set of their lemmas
+
+        :param token: the word for which the candidate set is generated
+        :param pos: if specified the synonyms will be restricted to this part of speech(v:verb,n:noun,a:adjective)
+        """
         synonyms = set()
         synsets = [
-            synset
-            for synset in wn.synsets(token)
-            if synset.pos() == self.pos or not self.pos
+            synset for synset in wn.synsets(token) if synset.pos() == pos or not pos
         ]
         for synset in synsets:
             lemmas = synset.lemma_names()
@@ -113,12 +128,18 @@ class WordNetInterface:
                 synonyms.add(lemmas[1])
         return synonyms
 
-    def get_hypernyms(self, token):
+    def get_hypernyms(self, token, pos=None):
+        """
+        gets all the hypernymic synsets from wordnet and returns a set of their lemmas
+
+        :param token: the word for which the candidate set is generated
+        :param pos: if specified the hypernyms will be restricted to this part of speech(v:verb,n:noun,a:adjective)
+        """
         hypernyms = set()
         synsets = [
             synset.hypernyms()[0]
             for synset in wn.synsets(token)
-            if synset.hypernyms() and (synset.pos() == self.pos or not self.pos)
+            if synset.hypernyms() and (synset.pos() == pos or not pos)
         ]
         for synset in synsets:
             lemmas = synset.lemma_names()
@@ -128,10 +149,16 @@ class WordNetInterface:
                 hypernyms.add(lemmas[1])
         return hypernyms
 
-    def get_candidate_set(self, token):
+    def get_candidate_set(self, token, pos=None):
+        """
+        gets all the synonymic and hypernymic synsets from wordnet and returns a set of their lemmas and the token
+
+        :param token: the word for which the candidate set is generated
+        :param pos: if specified the candidates will be restricted to this part of speech(v:verb,n:noun,a:adjective)
+        """
         candidates = set()
-        candidates.update(self.get_synonyms(token))
-        candidates.update(set(self.get_hypernyms(token)))
+        candidates.update(self.get_synonyms(token, pos=pos))
+        candidates.update(set(self.get_hypernyms(token, pos=pos)))
         candidates.difference_update(self.stops)
         candidates.add(token)
         return candidates
