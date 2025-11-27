@@ -116,6 +116,28 @@ class DataSet:
             partitions[num_train + num_dev : num_train + num_dev + num_test],
         )
 
+    def get_ith_split(self, i, n):
+        """
+        returns the two splits(train,test) at position i for nfold cross validation
+
+        :param i: which split of the data is extracted(starting with i=0, max n-1)
+        """
+        if i > n - 1:
+            raise ValueError("i can't be bigger than n-1")
+        num_sents = len(self.sentences)
+        num_per_split = math.floor(num_sents / n)
+        lower_index = i * num_per_split
+        test_split = (
+            self.sentences[lower_index : lower_index + num_per_split]
+            if i < n - 1
+            else self.sentences[lower_index:]
+        )
+        train_split = (
+            self.sentences[:lower_index]
+            + self.sentences[lower_index + len(test_split) :]
+        )
+        return train_split, test_split
+
 
 class Vectors:
     @staticmethod
