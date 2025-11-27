@@ -44,7 +44,7 @@ class NThresholdModel:
         self.fit_embeddings = fit_embeddings
         self.score_embeddings = score_embeddings
         self.decision_thresholds = [0.5 for i in range(num_classes - 1)]
-        self.restrict_pos=restrict_pos
+        self.restrict_pos = restrict_pos
         self.num_classes = num_classes
         self.stops = stopwords.words("english")
 
@@ -511,6 +511,7 @@ class ComparingModel(NThresholdModel):
             fit_embeddings=literal_embeddings,
             score_embeddings=associative_embeddings,
             use_output_vec=use_output_vec,
+            restrict_pos=False,
             num_classes=num_classes,
         )
         self.literal_embeddings = literal_embeddings
@@ -637,7 +638,13 @@ class ComparingModel(NThresholdModel):
 
 class RandomBaseline(NThresholdModel):
     def __init__(
-        self, dev_data, test_data, candidate_source, score_embeddings, restrict_pos,num_classes=2
+        self,
+        dev_data,
+        test_data,
+        candidate_source,
+        score_embeddings,
+        restrict_pos,
+        num_classes=2,
     ):
         """
         Model that randomly choses a word from the candidate set to predict the class with a threshold
