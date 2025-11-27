@@ -10,7 +10,12 @@ import re
 
 class SWOWInterface:
     def __init__(
-        self, number_of_responses, strength_file=None, use_ppmi=False, candidate_cap=0
+        self,
+        number_of_responses,
+        strength_file=None,
+        use_ppmi=False,
+        candidate_cap=0,
+        use_pos=None,
     ):
         self.work_dir = "/projekte/semrel/WORK-AREA/Users/navid/SWOW-EN18"
         self.strength_file = strength_file
@@ -18,9 +23,11 @@ class SWOWInterface:
         self.stops = stopwords.words("english")
         self.num_responses = number_of_responses
         self.use_ppmi = use_ppmi
+        self.use_pos = use_pos
         self.cues_to_responses, self.responses_to_cues, self.cue_response_count = (
             self.init_response_table()
         )
+        self.most_frequent_pos = self.read_in_pos_freq()
         """
         Interface for the Small World of Words Word Association Data by Simon De Deyne that can give out candidate sets for words
         the data consists of cues where people have given three responses they associate with the cue word
@@ -119,6 +126,32 @@ class SWOWInterface:
                         cue, response
                     )
         return pairs_to_strength, cues_to_index, responses
+
+    def read_in_pos_freq(self):
+        """
+        reads in and returns the most frequent part of speech for a token
+        """
+        most_frequent = dict()
+        with open("most_frequent_pos.tsv", "r", encoding="utf-8") as freqs:
+            for line in freqs:
+                pair = [word.strip() for word in line.split()]
+                most_frequent[pair[0]] = pair[1]
+        return most_frequent
+
+    def get_pos(self, token):
+        """
+        returns most frequent part of speech for a token according to frequency file, defaults to noun
+        """
+        tags = {"NN": "n", "JJ": "a", "VB": "v", "NI": "n", "NP": "n", "NR": "n"}
+        token = token.split("_")[0]
+        if token in self.most_frequent_pos:
+            tag = self.most_frequent_pos[token]
+        else:
+            return "n"
+        if tag in tags:
+            return tags[tag]
+        else:
+            return tag
 
     def read_in_strengths(self):
         """
@@ -258,6 +291,7 @@ class SWOWInterface:
                     response
                     for response in self.cues_to_responses[word]
                     if self.get_num_occurrences(word, response) >= self.candidate_cap
+                    if not self.use_pos or self.use_pos == self.get_pos(response)
                 ]
             )
         if word in self.responses_to_cues:
@@ -266,6 +300,7 @@ class SWOWInterface:
                     cue
                     for cue in self.responses_to_cues[word]
                     if self.get_num_occurrences(cue, word) >= self.candidate_cap
+                    if not self.use_pos or self.use_pos == self.get_pos(cue)
                 ]
             )
         return output.difference(self.stops)
