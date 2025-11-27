@@ -15,7 +15,6 @@ class SWOWInterface:
         strength_file=None,
         use_ppmi=False,
         candidate_cap=0,
-        use_pos=None,
     ):
         self.work_dir = "/projekte/semrel/WORK-AREA/Users/navid/SWOW-EN18"
         self.strength_file = strength_file
@@ -23,7 +22,6 @@ class SWOWInterface:
         self.stops = stopwords.words("english")
         self.num_responses = number_of_responses
         self.use_ppmi = use_ppmi
-        self.use_pos = use_pos
         self.cues_to_responses, self.responses_to_cues, self.cue_response_count = (
             self.init_response_table()
         )
@@ -280,9 +278,10 @@ class SWOWInterface:
             total += self.cue_response_count[word_2][word_1]
         return total
 
-    def get_candidate_set(self, word):
+    def get_candidate_set(self, word, pos=None):
         """
         returns all the responses given to the word and all the cues the word was given as a response to
+        pos: restricts result to a certain part of speech if given(v:verb,n:noun,a:adjective)
         """
         output = set()
         if word in self.cues_to_responses:
@@ -291,7 +290,7 @@ class SWOWInterface:
                     response
                     for response in self.cues_to_responses[word]
                     if self.get_num_occurrences(word, response) >= self.candidate_cap
-                    if not self.use_pos or self.use_pos == self.get_pos(response)
+                    if not pos or pos == self.get_pos(response)
                 ]
             )
         if word in self.responses_to_cues:
@@ -300,7 +299,7 @@ class SWOWInterface:
                     cue
                     for cue in self.responses_to_cues[word]
                     if self.get_num_occurrences(cue, word) >= self.candidate_cap
-                    if not self.use_pos or self.use_pos == self.get_pos(cue)
+                    if not pos or pos == self.get_pos(cue)
                 ]
             )
         return output.difference(self.stops)
@@ -312,8 +311,8 @@ class SWOWInterface:
         neighbours = self.get_candidate_set(token)
         total_strength = np.array(
             [
-                self.get_association_strength("star", candidate)
-                for candidate in self.get_candidate_set("star")
+                self.get_association_strength(token, candidate)
+                for candidate in self.get_candidate_set(token)
             ]
         ).sum()
         return {
