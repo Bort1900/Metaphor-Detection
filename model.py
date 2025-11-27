@@ -21,18 +21,20 @@ class NThresholdModel:
         fit_embeddings,
         score_embeddings,
         use_output_vec,
+        restrict_pos,
         num_classes=2,
     ):
         """
         Model that categorizes Sentence data in n classes based on n-1 thresholds and uses a candidate set for getting the value
-        dev_data: list of Sentence instances to train thresholds
-        test_data: list of Sentence instances to evaluate model
-        candidate_source: an object with a get_candidate_set function
-        mean_multi_word: whether embeddings for multi-word tokens should be mean pooled from the embeddings of the individual words
-        fit_embeddings: source for embeddings for finding best fit candidate
-        score_embeddings: source for embeddings for scoring for prediction
-        use_output_vec: whether ouput vectors(word2vec) should be used for comparing context to candidates
-        num_classes: number of classes to classify
+        :param dev_data: list of Sentence instances to train thresholds
+        :param test_data: list of Sentence instances to evaluate model
+        :param candidate_source: an object with a get_candidate_set function
+        :param mean_multi_word: whether embeddings for multi-word tokens should be mean pooled from the embeddings of the individual words
+        :param fit_embeddings: source for embeddings for finding best fit candidate
+        :param score_embeddings: source for embeddings for scoring for prediction
+        :param use_output_vec: whether output vectors(word2vec) should be used for comparing context to candidates
+        :param restrict_pos: wether candidate sets should be retricted by target part of speech
+        :param num_classes: number of classes to classify
         """
         self.dev_data = dev_data
         self.test_data = test_data
@@ -42,6 +44,7 @@ class NThresholdModel:
         self.fit_embeddings = fit_embeddings
         self.score_embeddings = score_embeddings
         self.decision_thresholds = [0.5 for i in range(num_classes - 1)]
+        self.restrict_pos=restrict_pos
         self.num_classes = num_classes
         self.stops = stopwords.words("english")
 
@@ -49,7 +52,7 @@ class NThresholdModel:
     def calculate_scores(confusion_matrix):
         """
         calculates and returns precision, recall, and f-score metrics for a given evaluation as a dictionary
-        confusion_matrix: result of the evaluation, prediction vs actual classes
+        :param confusion_matrix: result of the evaluation, prediction vs actual classes
         """
         num_classes = len(confusion_matrix)
         scores = dict()
@@ -93,7 +96,7 @@ class NThresholdModel:
     def evaluate(self, data, save_file=None):
         """
         returns a dictionary of recall, precision and f-score metrics after evaluating the model on test data
-        data: test data for evaluation
+        :param data: test data for evaluation
         """
         confusion_matrix = np.zeros([self.num_classes, self.num_classes])
         ignore_count = 0
@@ -119,7 +122,7 @@ class NThresholdModel:
     def predict(self, sentence):
         """
         returns the class that the model predicts for a given instance
-        sentence: instance to classify
+        :param sentence: instance to classify
         """
         try:
             similarity = self.get_compare_value(sentence)
@@ -132,7 +135,7 @@ class NThresholdModel:
     def get_compare_value(self, sentence):
         """
         returns the value that is compared with the model's thresholds
-        sentence: the instance that should be classified
+        :param sentence: the instance that should be classified
         """
         predicted_sense = self.best_fit(sentence)
         try:
@@ -145,9 +148,11 @@ class NThresholdModel:
     def best_fit(self, sentence):
         """
         returns the best fiting instance from the candidate set to calculate the threshold
-        sentence: the instance that should be classified
+        :param sentence: the instance that should be classified
         """
-        candidate_set = self.candidate_source.get_candidate_set(sentence.target)
+        candidate_set = self.candidate_source.get_candidate_set(
+            sentence.target, pos=sentence.pos if self.restrict_pos else None
+        )
         candidate_set.add(sentence.target_token)
         best_similarity = -1
         context = [word for word in sentence.context if word.lower() not in self.stops]
@@ -190,8 +195,8 @@ class NThresholdModel:
     def train_thresholds(self, increment, epochs):
         """
         trains the model's threshold on the dev_data
-        increment: how much the threshold should be changed on a wrong prediction
-        epochs: number of times the dev_data is run through the training process
+        :param increment: how much the threshold should be changed on a wrong prediction
+        :param epochs: number of times the dev_data is run through the training process
         """
         data_per_class = [
             [sentence for sentence in self.dev_data if sentence.value == i]
@@ -223,10 +228,10 @@ class NThresholdModel:
     def evaluate_per_threshold(self, start, steps, increment, save_file):
         """
         writes some evaluation metrics into a file after evaluating the model with different thresholds
-        start: the first threshold to test
-        steps: the number of thresholds to test
-        increment: the difference between two thresholds to test
-        save_file: where to store the results
+        :param start: the first threshold to test
+        :param steps: the number of thresholds to test
+        :param increment: the difference between two thresholds to test
+        :param save_file: where to store the results
         """
         if self.num_classes > 2:
             raise ValueError("only works for 2 classes")
@@ -245,7 +250,7 @@ class NThresholdModel:
     def draw_distribution_per_class(self, save_file, labels, title):
         """
         draws box plots of the distributions of the prediction scores for each of the classes
-        save_file: where the plots are stored
+        :param save_file: where the plots are stored
         """
         datapoints = [[] for _ in range(self.num_classes)]
         for sent in self.test_data:
@@ -269,17 +274,19 @@ class MaoModel(NThresholdModel):
         mean_multi_word,
         fit_embeddings,
         score_embeddings,
+        restrict_pos,
         use_output_vec,
     ):
         """
         Model that works like the model from the Mao(2018) paper, see NThresholdModel
-        dev_data: list of Sentence instances to train thresholds
-        test_data: list of Sentence instances to evaluate model
-        candidate_source: an object with a get_candidate_set function
-        mean_multi_word: whether embeddings for multi-word tokens should be mean pooled from the embeddings of the individual words
-        fit_embeddings: source for embeddings for finding best fit candidate
-        score_embeddings: source for embeddings for scoring for prediction
-        use_output_vec: whether ouput vectors(word2vec) should be used for comparing context to candidates
+        :param dev_data: list of Sentence instances to train thresholds
+        :param test_data: list of Sentence instances to evaluate model
+        :param candidate_source: an object with a get_candidate_set function
+        :param mean_multi_word: whether embeddings for multi-word tokens should be mean pooled from the embeddings of the individual words
+        :param fit_embeddings: source for embeddings for finding best fit candidate
+        :param score_embeddings: source for embeddings for scoring for prediction
+        :param restrict_pos: wether candidate sets should be retricted by target part of speech
+        :param use_output_vec: whether ouput vectors(word2vec) should be used for comparing context to candidates
         """
         super().__init__(
             dev_data=dev_data,
@@ -288,15 +295,16 @@ class MaoModel(NThresholdModel):
             mean_multi_word=mean_multi_word,
             fit_embeddings=fit_embeddings,
             score_embeddings=score_embeddings,
+            restrict_pos=restrict_pos,
             use_output_vec=use_output_vec,
         )
 
     def train_threshold(self, increment, epochs, batch_size=-1):
         """
         looks for optimal threshold by approximating recall to precision
-        increment: initial threshold change when approximating
-        epochs: number of times to go over development data
-        batch_size: number of datapoints after which threshold is aligned, if -1 the dataset will not be separated into batches
+        :param increment: initial threshold change when approximating
+        :param epochs: number of times to go over development data
+        :param batch_size: number of datapoints after which threshold is aligned, if -1 the dataset will not be separated into batches
         """
 
         if batch_size < 0:
@@ -384,18 +392,20 @@ class ContextualMaoModel(NThresholdModel):
         fit_embeddings,
         score_embeddings,
         comparing_phrase,
+        restrict_pos,
         num_classes=2,
     ):
         """
         like Mao Model but uses contextual embeddings
-        dev_data: list of Sentence instances to train thresholds
-        test_data: list of Sentence instances to evaluate model
-        candidate_source: an object with a get_candidate_set function
-        mean_multi_word: whether embeddings for multi-word tokens should be mean pooled from the embeddings of the individual words
-        embeddings: source for embeddings for comparing
-        use_output_vec: whether ouput vectors(word2vec) should be used for comparing context to candidates
-        comparing_phrase: Context to create candidate embeddings: '[Target] [comparing_phrase] [candidate]'
-        num_classes: number of classes to classify
+        :param dev_data: list of Sentence instances to train thresholds
+        :param test_data: list of Sentence instances to evaluate model
+        :param candidate_source: an object with a get_candidate_set function
+        :param mean_multi_word: whether embeddings for multi-word tokens should be mean pooled from the embeddings of the individual words
+        :param embeddings: source for embeddings for comparing
+        :param use_output_vec: whether ouput vectors(word2vec) should be used for comparing context to candidates
+        :param comparing_phrase: Context to create candidate embeddings: '[Target] [comparing_phrase] [candidate]'
+        :param restrict_pos: wether candidate sets should be retricted by target part of speech
+        :param num_classes: number of classes to classify
         """
         super().__init__(
             dev_data=dev_data,
@@ -405,6 +415,7 @@ class ContextualMaoModel(NThresholdModel):
             fit_embeddings=fit_embeddings,
             score_embeddings=score_embeddings,
             use_output_vec=False,
+            restrict_pos=restrict_pos,
             num_classes=num_classes,
         )
         self.comparing_phrase = comparing_phrase
@@ -413,9 +424,11 @@ class ContextualMaoModel(NThresholdModel):
     def best_fit(self, sentence):
         """
         returns the best candidate from the candidate set that fits into the sentence context
-        sentence: sentence that will be predicted
+        :param sentence: sentence that will be predicted
         """
-        candidate_set = self.candidate_source.get_candidate_set(sentence.target)
+        candidate_set = self.candidate_source.get_candidate_set(
+            sentence.target, pos=sentence.pos if self.restrict_pos else None
+        )
         candidate_set.add(sentence.target_token)
         best_similarity = -1
         context_vector = self.fit_embeddings.get_context_vector(sentence)
@@ -444,7 +457,7 @@ class ContextualMaoModel(NThresholdModel):
     def get_compare_value(self, sentence):
         """
         returns the value that is used to determine the prediction
-        sentence: Sentence instance that will be predicted
+        :param sentence: Sentence instance that will be predicted
         """
         predicted_sense = self.best_fit(sentence)
         comparison_target_sentence = Sentence(
@@ -483,12 +496,12 @@ class ComparingModel(NThresholdModel):
     ):
         """
         model that compares literal and associative similarity and predicts metaphoricity with a threshold
-        dev_data: list of Sentence instances to train thresholds
-        test_data: list of Sentence instances to evaluate model
-        literal_embeddings: Semantic Embeddings for comparing
-        use_output_vec: whether ouput vectors(word2vec) should be used for comparing context to candidates
-        num_classes: number of classes to classify
-        associative_embeddings: WordAssociationEmbeddings instance
+        :param dev_data: list of Sentence instances to train thresholds
+        :param test_data: list of Sentence instances to evaluate model
+        :param literal_embeddings: Semantic Embeddings for comparing
+        :param use_output_vec: whether ouput vectors(word2vec) should be used for comparing context to candidates
+        :param num_classes: number of classes to classify
+        :param associative_embeddings: WordAssociationEmbeddings instance
         """
         super().__init__(
             dev_data=dev_data,
@@ -507,7 +520,7 @@ class ComparingModel(NThresholdModel):
     def get_compare_value(self, sentence):
         """
         get a value by comparing literal and associative similarities to context
-        sentence: the Sentence instance for the calculation
+        :param sentence: the Sentence instance for the calculation
         """
         try:
             literal_similarity, associative_similarity = self.get_similarities(sentence)
@@ -543,10 +556,10 @@ class ComparingModel(NThresholdModel):
     def evaluate_per_threshold(self, start, steps, increment, save_file):
         """
         writes some evaluation metrics into a file after evaluating the model with different thresholds
-        start: the first threshold to test
-        steps: the number of thresholds to test
-        increment: the difference between two thresholds to test
-        save_file: where to store the results
+        :param start: the first threshold to test
+        :param steps: the number of thresholds to test
+        :param increment: the difference between two thresholds to test
+        :param save_file: where to store the results
         """
         self.estimate_map_factor()
         return super().evaluate_per_threshold(start, steps, increment, save_file)
@@ -587,9 +600,9 @@ class ComparingModel(NThresholdModel):
 
     def train_thresholds(self, increment, epochs):
         """
-        trains the model's threshold on the dev_data
-        increment: how much the threshold should be changed on a wrong prediction
-        epochs: number of times the dev_data is run through the training process
+        :param trains the model's threshold on the dev_data
+        :param increment: how much the threshold should be changed on a wrong prediction
+        :param epochs: number of times the dev_data is run through the training process
         """
         ignore_count = 0
         self.estimate_map_factor()
@@ -624,16 +637,16 @@ class ComparingModel(NThresholdModel):
 
 class RandomBaseline(NThresholdModel):
     def __init__(
-        self, dev_data, test_data, candidate_source, score_embeddings, num_classes=2
+        self, dev_data, test_data, candidate_source, score_embeddings, restrict_pos,num_classes=2
     ):
         """
         Model that randomly choses a word from the candidate set to predict the class with a threshold
-        dev_data: list of Sentence instances to train thresholds
-        test_data: list of Sentence instances to evaluate model
-        candidate_source: an object with a get_candidate_set function
-        embeddings: source for embeddings for comparing
-        num_classes: number of classes for prediction
-
+        :param dev_data: list of Sentence instances to train thresholds
+        :param test_data: list of Sentence instances to evaluate model
+        :param candidate_source: an object with a get_candidate_set function
+        :param embeddings: source for embeddings for comparing
+        :param restrict_pos: wether candidate sets should be retricted by target part of speech
+        :param num_classes: number of classes for prediction
         """
         super().__init__(
             dev_data=dev_data,
@@ -643,6 +656,7 @@ class RandomBaseline(NThresholdModel):
             score_embeddings=score_embeddings,
             fit_embeddings=score_embeddings,
             use_output_vec=False,
+            restrict_pos=restrict_pos,
             num_classes=num_classes,
         )
 
@@ -651,6 +665,8 @@ class RandomBaseline(NThresholdModel):
         returns random element from the candidate set
         sentence: Sentence instance the model will predict
         """
-        candidate_set = self.candidate_source.get_candidate_set(sentence.target)
+        candidate_set = self.candidate_source.get_candidate_set(
+            sentence.target, pos=sentence.pos if self.restrict_pos else None
+        )
         candidate_set.add(sentence.target_token)
         return random.choice(list(candidate_set))
