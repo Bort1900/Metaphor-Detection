@@ -93,11 +93,14 @@ class NThresholdModel:
         )
         return scores
 
-    def evaluate(self, data, save_file=None):
+    def evaluate(self, data=None, save_file=None):
         """
         returns a dictionary of recall, precision and f-score metrics after evaluating the model on test data
-        :param data: test data for evaluation
+        :param data: test data for evaluation, defaults to test data
+        :param save_file: filepath for possible storing
         """
+        if not data:
+            data = self.test_data
         confusion_matrix = np.zeros([self.num_classes, self.num_classes])
         ignore_count = 0
         for sentence in tqdm(data):
@@ -117,6 +120,38 @@ class NThresholdModel:
                     "Decision thresholds: " + str(self.decision_thresholds)[1:-1] + "\n"
                 )
                 output.write(str(scores))
+        return scores
+
+    def nfold_cross_validate(self, n, save_file=None):
+        """
+        performs nfold cross validation for the model and returns the mean evaluation measures
+
+        :param n: number of splits
+        :param save_file: filepath for possible storing
+        """
+        mean_thresholds = [0 for _ in range(len(self.decision_thresholds))]
+        output = dict()
+        for i in range(n):
+            test_split, train_split = self.data.get_ith_split(i, n)
+            self.train_thresholds(0.01, 5, train_split)
+            scores = self.evaluate(test_split)
+            for j in range(len(mean_thresholds)):
+                mean_thresholds[j] += self.decision_thresholds[j]
+            for measure in scores:
+                if measure in output:
+                    output[measure] += scores[measure]
+                else:
+                    output[measure] = scores[measure]
+        for j in range(len(mean_thresholds)):
+            mean_thresholds[j] /= n
+        for measure in output:
+            output[measure] /= n
+        if save_file:
+            with open(save_file, "w", encoding="utf-8") as output:
+                output.write(
+                    "Mean decision thresholds: " + str(mean_thresholds)[1:-1] + "\n"
+                )
+                output.write(str(output))
         return scores
 
     def predict(self, sentence):
@@ -192,12 +227,16 @@ class NThresholdModel:
                 best_candidate = candidate
         return best_candidate
 
-    def train_thresholds(self, increment, epochs):
+    def train_thresholds(self, increment, epochs, data=None):
         """
         trains the model's threshold on the dev_data
+
         :param increment: how much the threshold should be changed on a wrong prediction
         :param epochs: number of times the dev_data is run through the training process
+        :param data: data to train on, defaults to dev data
         """
+        if not data:
+            data = self.dev_data
         data_per_class = [
             [sentence for sentence in self.dev_data if sentence.value == i]
             for i in range(self.num_classes)
