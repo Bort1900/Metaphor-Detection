@@ -31,13 +31,21 @@ def urban_extractor(filepath, use_unsure):
                     else:
                         print(f"{datapoint[2]} is not a valid value")
                         raise ValueError(f"{datapoint[2]} is not a valid value")
-                    sentence = Sentence(
+                    verb_sentence = Sentence(
                         sentence=datapoint[3],
                         target=datapoint[0].split()[0],
                         value=value,
                         phrase=datapoint[0],
+                        pos="v",
                     )
-                    sentences.append(sentence)
+                    noun_sentence = Sentence(
+                        sentence=datapoint[3],
+                        target=datapoint[0].split()[1],
+                        value=value,
+                        phrase=datapoint[0],
+                        pos="n",
+                    )
+                    sentences += [verb_sentence, noun_sentence]
                 except ValueError:
                     fail_counter += 1
     print(f"Ignored {fail_counter} of {len(sentences)}")
@@ -65,7 +73,7 @@ def mohammad_extractor(filepath, use_unsure):
                     # remove special tokens
                     tokens = re.sub(r"<.*?>", "", datapoint[2])
                     sentence = Sentence(
-                        sentence=tokens, target=datapoint[0], value=value
+                        sentence=tokens, target=datapoint[0], value=value, pos="v"
                     )
                     sentences.append(sentence)
                 except ValueError:
