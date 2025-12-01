@@ -93,17 +93,20 @@ class NThresholdModel:
         )
         return scores
 
-    def evaluate(self, data=None, save_file=None):
+    def evaluate(self, data=None, save_file=None, by_pos=None):
         """
         returns a dictionary of recall, precision and f-score metrics after evaluating the model on test data
         :param data: test data for evaluation, defaults to test data
         :param save_file: filepath for possible storing
+        :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
         """
         if not data:
             data = self.test_data
         confusion_matrix = np.zeros([self.num_classes, self.num_classes])
         ignore_count = 0
         for sentence in tqdm(data):
+            if by_pos and sentence.pos not in by_pos:
+                continue
             try:
                 prediction = int(self.predict(sentence))
             except ValueError:
@@ -122,19 +125,20 @@ class NThresholdModel:
                 output.write(str(scores))
         return scores
 
-    def nfold_cross_validate(self, n, save_file=None):
+    def nfold_cross_validate(self, n, save_file=None, by_pos=None):
         """
         performs nfold cross validation for the model and returns the mean evaluation measures
 
         :param n: number of splits
         :param save_file: filepath for possible storing
+        :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
         """
         mean_thresholds = [0 for _ in range(len(self.decision_thresholds))]
         output = dict()
         for i in range(n):
             test_split, train_split = self.data.get_ith_split(i, n)
             self.train_thresholds(0.01, 5, train_split)
-            scores = self.evaluate(test_split)
+            scores = self.evaluate(test_split, by_pos=by_pos)
             for j in range(len(mean_thresholds)):
                 mean_thresholds[j] += self.decision_thresholds[j]
             for measure in scores:
@@ -227,13 +231,14 @@ class NThresholdModel:
                 best_candidate = candidate
         return best_candidate
 
-    def train_thresholds(self, increment, epochs, data=None):
+    def train_thresholds(self, increment, epochs, data=None, by_pos=None):
         """
         trains the model's threshold on the dev_data
 
         :param increment: how much the threshold should be changed on a wrong prediction
         :param epochs: number of times the dev_data is run through the training process
         :param data: data to train on, defaults to dev data
+        :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
         """
         if not data:
             data = self.dev_data
@@ -249,6 +254,8 @@ class NThresholdModel:
                 data += random.choices(population=class_data, k=num_per_class)
             random.shuffle(data)
             for sentence in tqdm(data):
+                if by_pos and sentence.pos not in by_pos:
+                    continue
                 try:
                     comp_value = self.get_compare_value(sentence)
                     prediction = int(self.predict(sentence))
