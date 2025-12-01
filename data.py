@@ -32,7 +32,7 @@ class Sentence:
         else:
             # search for inflection of target
             for i, token in enumerate(self.tokens):
-                if target == wnl.lemmatize(token.lower()):
+                if target == wnl.lemmatize(token.lower(), pos="n" if not pos else pos):
                     self.target_index = i
                     self.target_token = token.lower()
                     break
