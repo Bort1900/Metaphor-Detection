@@ -271,13 +271,14 @@ class NThresholdModel:
                 self.decision_thresholds.sort()
             print(f"Current Thresholds: {self.decision_thresholds}")
 
-    def evaluate_per_threshold(self, start, steps, increment, save_file):
+    def evaluate_per_threshold(self, start, steps, increment, save_file, by_pos=None):
         """
         writes some evaluation metrics into a file after evaluating the model with different thresholds
         :param start: the first threshold to test
         :param steps: the number of thresholds to test
         :param increment: the difference between two thresholds to test
         :param save_file: where to store the results
+        :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
         """
         if self.num_classes > 2:
             raise ValueError("only works for 2 classes")
@@ -287,24 +288,27 @@ class NThresholdModel:
                 "Threshold\tPrecision\tRecall\tF1(Class 1)\tF1(Class 2)\tF1(Macro-Average)\n"
             )
             for i in range(steps):
-                scores = self.evaluate(self.test_data)
+                scores = self.evaluate(self.test_data, by_pos=by_pos)
                 output.write(
                     f"{round(self.decision_thresholds[0],2)}\t{round(scores["precision_class_0"],2)}\t{round(scores["recall_class_0"],2)}\t{round(scores["f_1_class_0"],2)}\t{round(scores["f_1_class_1"],2)}\t{round(scores["macro_f_1"],2)}\n"
                 )
                 self.decision_thresholds[0] += increment
 
-    def draw_distribution_per_class(self, save_file, labels, title):
+    def draw_distribution_per_class(self, save_file, labels, title, by_pos=None):
         """
         draws box plots of the distributions of the prediction scores for each of the classes
+        :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
         :param save_file: where the plots are stored
         """
         datapoints = [[] for _ in range(self.num_classes)]
         for sent in self.test_data:
+            if by_pos and sent.pos not in by_pos:
+                continue
             try:
                 similarity = self.get_compare_value(sent)
             except ValueError:
                 continue
-            datapoints[sent.value].append(similarity)
+            datapoints[sent.value].append(similarity.cpu())
         plt.boxplot(datapoints, labels=labels, orientation="horizontal")
         plt.title(title)
         plt.savefig(save_file, bbox_inches="tight")
@@ -433,8 +437,8 @@ class ContextualMaoModel(NThresholdModel):
         mean_multi_word,
         fit_embeddings,
         score_embeddings,
-        comparing_phrase,
         restrict_pos,
+        use_context_vec,
         num_classes=2,
     ):
         """
@@ -443,8 +447,7 @@ class ContextualMaoModel(NThresholdModel):
         :param candidate_source: an object with a get_candidate_set function
         :param mean_multi_word: whether embeddings for multi-word tokens should be mean pooled from the embeddings of the individual words
         :param embeddings: source for embeddings for comparing
-        :param use_output_vec: whether ouput vectors(word2vec) should be used for comparing context to candidates
-        :param comparing_phrase: Context to create candidate embeddings: '[Target] [comparing_phrase] [candidate]'
+        :param use_context_vec: whether context vector should be used for comparing context to candidates instead of target word in context
         :param restrict_pos: wether candidate sets should be retricted by target part of speech
         :param num_classes: number of classes to classify
         """
@@ -458,7 +461,7 @@ class ContextualMaoModel(NThresholdModel):
             restrict_pos=restrict_pos,
             num_classes=num_classes,
         )
-        self.comparing_phrase = comparing_phrase
+        self.use_context_vec = use_context_vec
         self.cos = CosineSimilarity(dim=0, eps=1e-6)
 
     def best_fit(self, sentence):
@@ -471,24 +474,21 @@ class ContextualMaoModel(NThresholdModel):
         )
         candidate_set.add(sentence.target_token)
         best_similarity = -1
-        context_vector = self.fit_embeddings.get_context_vector(sentence)
+        if self.use_context_vec:
+            compare_vector = self.fit_embeddings.get_context_vector(sentence)
+        else:
+            compare_vector = self.fit_embeddings.get_sentence_vector(sentence)
         best_candidate = sentence.target
-        comparison_sentence = Sentence(
-            sentence=f"{sentence.target} {self.comparing_phrase} xyz.",
-            target="xyz",
-            value=0,
-        )
         for candidate in candidate_set:
-            try:
-                new_sent = comparison_sentence.replace_target(
-                    candidate,
-                    self.mean_multi_word,
-                    target_index=comparison_sentence.target_index,
+            if len(candidate.split("_")) > 1 and self.mean_multi_word:
+                candidate_vector = self.fit_embeddings.get_mean_vector(
+                    tokens=candidate.split("_")
                 )
-            except:
-                continue
-            candidate_vector = self.fit_embeddings.get_input_vector(new_sent)
-            similarity = self.cos(candidate_vector, context_vector)
+            else:
+                candidate_vector = self.fit_embeddings.get_input_vector(
+                    candidate, pos=sentence.pos
+                )
+            similarity = self.cos(candidate_vector, compare_vector)
             if similarity >= best_similarity:
                 best_similarity = similarity
                 best_candidate = candidate
@@ -498,29 +498,19 @@ class ContextualMaoModel(NThresholdModel):
         """
         returns the value that is used to determine the prediction
         :param sentence: Sentence instance that will be predicted
+
         """
         predicted_sense = self.best_fit(sentence)
-        comparison_target_sentence = Sentence(
-            sentence=f"{sentence.target} {self.comparing_phrase} {predicted_sense}.",
-            target=sentence.target,
-            value=0,
-        )
-        comparison_candidate_sentence = Sentence(
-            sentence=f"{sentence.target} {self.comparing_phrase} xyz.",
-            target="xyz",
-            value=0,
-        )
-        comparison_candidate_sentence = comparison_candidate_sentence.replace_target(
-            new_target=predicted_sense,
-            split_multi_word=self.mean_multi_word,
-            target_index=comparison_candidate_sentence.target_index,
-        )
-        target_vector = self.score_embeddings.get_input_vector(
-            comparison_target_sentence
-        )
-        predicted_vector = self.score_embeddings.get_input_vector(
-            comparison_candidate_sentence
-        )
+        target_vector = self.score_embeddings.get_input_vector(sentence.target)
+        if len(predicted_sense.split("_")) > 1 and self.mean_multi_word:
+            predicted_vector = self.fit_embeddings.get_mean_vector(
+                tokens=predicted_sense.split("_")
+            )
+        else:
+            predicted_vector = self.fit_embeddings.get_input_vector(
+                predicted_sense, pos=sentence.pos
+            )
+
         return self.cos(target_vector, predicted_vector)
 
 
