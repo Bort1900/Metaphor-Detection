@@ -205,6 +205,7 @@ class BertEmbeddings(Embeddings):
         if torch.cuda.is_available():
             self.model.to("cuda")
         self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+        self.lookup_table = dict()
 
     def get_sentence_vector(self, sentence):
         """
@@ -253,11 +254,13 @@ class BertEmbeddings(Embeddings):
         :param pos: part of speech the example sentences should be restricted to
         :param exclude_sent: sentence that should not be included in the example sentences
         """
-
+        if (token, pos) in self.lookup_table and not exclude_sent:
+            return self.lookup_table[(token, pos)]
         sentences = []
         for synset in wn.synsets(token):
-            if synset.pos() == pos or not pos:
+            if not pos or synset.pos() in pos:
                 for example in synset.examples():
+
                     try:
                         sent = Sentence(example, target=token, value=1, pos=pos)
                     except ValueError:
@@ -266,16 +269,22 @@ class BertEmbeddings(Embeddings):
                         sentences.append(sent)
         vecs = [self.get_sentence_vector(sentence) for sentence in sentences]
         if len(vecs) == 0:
-            if pos == "n":
+            if pos == ["n"]:
                 sentence = "This is a " + token + "."
-            elif pos == "v":
+            elif pos == ["v"]:
                 sentence = "I can " + token + "."
-            elif pos == "a":
+            elif pos == ["a"]:
                 sentence = "It's a " + token + " thing."
             else:
                 sentence = "What is the meaning of " + token + "?"
-            return self.get_sentence_vector(Sentence(sentence, token, 1, pos=pos))
-        return torch.stack(vecs).mean(dim=0)
+
+            output = self.get_sentence_vector(Sentence(sentence, token, 1, pos=pos))
+        else:
+            output = torch.stack(vecs).mean(dim=0)
+
+        if not exclude_sent:
+            self.lookup_table[(token, pos)] = output
+        return output
 
     def get_context_vector(self, sentence):
         """
@@ -295,4 +304,5 @@ class BertEmbeddings(Embeddings):
                     embeddings.append(self.get_sentence_vector(token_sent))
                 except KeyError:
                     continue
+
         return torch.stack(embeddings).mean(dim=0)
