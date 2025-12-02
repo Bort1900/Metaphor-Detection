@@ -206,7 +206,7 @@ class BertEmbeddings(Embeddings):
             self.model.to("cuda")
         self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
 
-    def get_input_vector(self, sentence):
+    def get_sentence_vector(self, sentence):
         """
         returns contextual Bert embedding for the sentence target
         sentence: Sentence instance for whose target the embedding is given
@@ -232,25 +232,50 @@ class BertEmbeddings(Embeddings):
                 ]
             ).mean(dim=0)
 
-    def get_mean_vector(self, sentence, use_input_vecs=True):
+    def get_mean_vector(self, tokens, use_input_vecs=True):
         """
-        returns mean pooled embedding for words of a sentence
-        sentence: Sentence instance whose embeddings are mean pooled
+        returns mean pooled embedding for a list of tokens
+        tokens: list of tokens whose embeddings are mean pooled
         use_input_vecs: irrelevant
         """
         embeddings = []
-        for token in sentence.tokens:
-            token_sent = Sentence(
-                sentence=sentence.sentence,
-                target=token,
-                value=sentence.value,
-                phrase=sentence.phrase,
-            )
-            try:
-                embeddings.append(self.get_input_vector(token_sent))
-            except KeyError:
-                continue
+        for token in tokens:
+            embeddings.append(self.get_input_vector(token))
+        if None in embeddings:
+            print(tokens)
         return torch.stack(embeddings).mean(dim=0)
+
+    def get_input_vector(self, token, pos=None, exclude_sent=None):
+        """
+        returns the contextual embeddings by mean pooling word net examples for the token
+
+        :param token: token for which the embedding is generated
+        :param pos: part of speech the example sentences should be restricted to
+        :param exclude_sent: sentence that should not be included in the example sentences
+        """
+
+        sentences = []
+        for synset in wn.synsets(token):
+            if synset.pos() == pos or not pos:
+                for example in synset.examples():
+                    try:
+                        sent = Sentence(example, target=token, value=1, pos=pos)
+                    except ValueError:
+                        continue
+                    if not exclude_sent or sent.sentence != exclude_sent.sentence:
+                        sentences.append(sent)
+        vecs = [self.get_sentence_vector(sentence) for sentence in sentences]
+        if len(vecs) == 0:
+            if pos == "n":
+                sentence = "This is a " + token + "."
+            elif pos == "v":
+                sentence = "I can " + token + "."
+            elif pos == "a":
+                sentence = "It's a " + token + " thing."
+            else:
+                sentence = "What is the meaning of " + token + "?"
+            return self.get_sentence_vector(Sentence(sentence, token, 1, pos=pos))
+        return torch.stack(vecs).mean(dim=0)
 
     def get_context_vector(self, sentence):
         """
@@ -267,7 +292,7 @@ class BertEmbeddings(Embeddings):
                     phrase=sentence.phrase,
                 )
                 try:
-                    embeddings.append(self.get_input_vector(token_sent))
+                    embeddings.append(self.get_sentence_vector(token_sent))
                 except KeyError:
                     continue
         return torch.stack(embeddings).mean(dim=0)
