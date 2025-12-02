@@ -151,11 +151,11 @@ class NThresholdModel:
         for measure in output:
             output[measure] /= n
         if save_file:
-            with open(save_file, "w", encoding="utf-8") as output:
-                output.write(
+            with open(save_file, "w", encoding="utf-8") as write_file:
+                write_file.write(
                     "Mean decision thresholds: " + str(mean_thresholds)[1:-1] + "\n"
                 )
-                output.write(str(output))
+                write_file.write(str(output))
         return scores
 
     def predict(self, sentence):
