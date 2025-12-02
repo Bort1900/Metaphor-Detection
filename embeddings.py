@@ -18,13 +18,13 @@ class Embeddings:
         """
         pass
 
-    def get_mean_vector(self, tokens, use_input_vecs=True):
+    def get_mean_vector(self, tokens, use_output_vecs=False):
         """
         returns the mean pooled embeddings for a list of tokens
         tokens: list of tokens whose embeddings are mean pooled
-        use_input_vecs: whether to use input or output vectors
+        use_output_vecs: whether to use input or output vectors
         """
-        if use_input_vecs:
+        if use_output_vecs:
             embeddings = []
             for token in tokens:
                 try:
@@ -86,7 +86,7 @@ class FasttextModel(Embeddings):
                 raise ValueError(
                     f"Could not create output vector for unseen word{token}"
                 )
-            return self.get_mean_vector(tokens=spare_candidates, use_input_vecs=False)
+            return self.get_mean_vector(tokens=spare_candidates, use_output_vecs=True)
         return self.output_matrix[word_id]
 
     # def train(self, min_count=1):
@@ -233,11 +233,11 @@ class BertEmbeddings(Embeddings):
                 ]
             ).mean(dim=0)
 
-    def get_mean_vector(self, tokens, use_input_vecs=True):
+    def get_mean_vector(self, tokens, use_output_vecs=True):
         """
         returns mean pooled embedding for a list of tokens
-        tokens: list of tokens whose embeddings are mean pooled
-        use_input_vecs: irrelevant
+        :param tokens: list of tokens whose embeddings are mean pooled
+        :param use_output_vecs: irrelevant
         """
         embeddings = []
         for token in tokens:

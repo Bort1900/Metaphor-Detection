@@ -202,7 +202,7 @@ class NThresholdModel:
                 try:
                     if len(candidate.split("_")) > 1 and self.mean_multi_word:
                         candidate_vector = self.fit_embeddings.get_mean_vector(
-                            tokens=candidate.split("_"), use_input_vecs=False
+                            tokens=candidate.split("_"), use_output_vecs=True
                         )
                     else:
                         candidate_vector = self.fit_embeddings.get_output_vector(
@@ -563,7 +563,7 @@ class ComparingModel(NThresholdModel):
         """
         try:
             literal_context_vec = self.literal_embeddings.get_mean_vector(
-                sentence.context, not self.use_output
+                sentence.context, self.use_output
             )
             associative_context_vec = self.associative_embeddings.get_mean_vector(
                 sentence.context
