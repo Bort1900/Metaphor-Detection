@@ -179,10 +179,20 @@ class NThresholdModel:
         predicted_sense = self.best_fit(sentence)
         try:
             target_vector = self.score_embeddings.get_input_vector(sentence.target)
-            predicted_vector = self.score_embeddings.get_input_vector(predicted_sense)
+            if len(predicted_sense.split("_")) > 1 and self.mean_multi_word:
+                predicted_vector = self.score_embeddings.get_mean_vector(
+                    tokens=predicted_sense.split("_")
+                )
+            else:
+                predicted_vector = self.score_embeddings.get_input_vector(
+                    predicted_sense, pos=sentence.pos
+                )
         except KeyError:
             raise ValueError(f"{sentence.target} not in dictionary")
-        return Vectors.cos_sim(target_vector, predicted_vector)
+        if type(target_vector) == np.ndarray:
+            return Vectors.cos_sim(target_vector, predicted_vector)
+        elif type(target_vector) == torch.Tensor:
+            return self.cos(target_vector, predicted_vector)
 
     def best_fit(self, sentence):
         """
@@ -493,25 +503,6 @@ class ContextualMaoModel(NThresholdModel):
                 best_similarity = similarity
                 best_candidate = candidate
         return best_candidate
-
-    def get_compare_value(self, sentence):
-        """
-        returns the value that is used to determine the prediction
-        :param sentence: Sentence instance that will be predicted
-
-        """
-        predicted_sense = self.best_fit(sentence)
-        target_vector = self.score_embeddings.get_input_vector(sentence.target)
-        if len(predicted_sense.split("_")) > 1 and self.mean_multi_word:
-            predicted_vector = self.fit_embeddings.get_mean_vector(
-                tokens=predicted_sense.split("_")
-            )
-        else:
-            predicted_vector = self.fit_embeddings.get_input_vector(
-                predicted_sense, pos=sentence.pos
-            )
-
-        return self.cos(target_vector, predicted_vector)
 
 
 class ComparingModel(NThresholdModel):

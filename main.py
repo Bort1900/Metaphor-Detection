@@ -88,33 +88,33 @@ if __name__ == "__main__":
     URBAN_DIR = "/projekte/semrel/Annotations/Figurative-Language/multilingual_EN_DE_SI_lit-fig_v-obj_abstract-concrete/English"
     SWOW_DIR = "/projekte/semrel/WORK-AREA/Users/navid/SWOW-EN18"
     print("loading interfaces")
-    swow_r1 = SWOWInterface(
-        number_of_responses=1, strength_file="strength.SWOW-EN.R1.20180827.csv"
-    )
-    swow_r12 = SWOWInterface(
-        number_of_responses=2, strength_file="strengths_manually_r12.tsv"
-    )
-    swow_r123 = SWOWInterface(
-        number_of_responses=3, strength_file="strength.SWOW-EN.R123.20180827.csv"
-    )
-    wn = WordNetInterface(use_pos="v")
+    # swow_r1 = SWOWInterface(
+    #     number_of_responses=1, strength_file="strength.SWOW-EN.R1.20180827.csv"
+    # )
+    # swow_r12 = SWOWInterface(
+    #     number_of_responses=2, strength_file="strengths_manually_r12.tsv"
+    # )
+    # swow_r123 = SWOWInterface(
+    #     number_of_responses=3, strength_file="strength.SWOW-EN.R123.20180827.csv"
+    # )
+    wn = WordNetInterface()
     print("loading embeddings")
     urban_dataset = "/projekte/semrel/Annotations/Figurative-Language/multilingual_EN_DE_SI_lit-fig_v-obj_abstract-concrete/English/example_sentences_verb-object.tsv"
     fasttext_dir = "/projekte/semrel/WORK-AREA/Users/navid/wiki.en.bin"
     fasttext_2_dir = "/projekte/semrel/WORK-AREA/Users/navid/cc.en.300.bin"
     mohammad_dataset = "/projekte/semrel/WORK-AREA/Users/navid/Metaphor-Emotion-Data-Files/Data-metaphoric-or-literal.txt"
-    swow_embeddings_r1 = WordAssociationEmbeddings(
-        swow=swow_r1,
-        index_file="cue_indices_r1.tsv",
-        embedding_file="/projekte/semrel/WORK-AREA/Users/navid/graph_embeddings/graph_embeddings_300_r1.npy",
-    )
-    swow_embeddings_r123 = WordAssociationEmbeddings(
-        swow=swow_r123,
-        index_file="cue_indices.tsv",
-        embedding_file=os.path.join(
-            DATA_DIR, "graph_embeddings/graph_embeddings_300.npy"
-        ),
-    )
+    # swow_embeddings_r1 = WordAssociationEmbeddings(
+    #     swow=swow_r1,
+    #     index_file="cue_indices_r1.tsv",
+    #     embedding_file="/projekte/semrel/WORK-AREA/Users/navid/graph_embeddings/graph_embeddings_300_r1.npy",
+    # )
+    # swow_embeddings_r123 = WordAssociationEmbeddings(
+    #     swow=swow_r123,
+    #     index_file="cue_indices.tsv",
+    #     embedding_file=os.path.join(
+    #         DATA_DIR, "graph_embeddings/graph_embeddings_300.npy"
+    #     ),
+    # )
 
     # swow_embeddings_r12 = WordAssociationEmbeddings(
     #     swow=swow_r12,
@@ -126,7 +126,10 @@ if __name__ == "__main__":
     #     index_file="cue_indices_manually_r123.tsv",
     #     embedding_file="/projekte/semrel/WORK-AREA/Users/navid/graph_embeddings/graph_embeddings_manually_300_r123.npy",
     # )
-    embeddings = FasttextModel(load_file=fasttext_dir)
+    # embeddings = FasttextModel(load_file=fasttext_dir)
+    contextual_embeddings_l8 = BertEmbeddings([8])
+    contextual_embeddings_l12 = BertEmbeddings([12])
+    contextual_embeddings_l9_12 = BertEmbeddings([9, 10, 11, 12])
     print("loading datasets")
     urban_data = DataSet(
         filepath=urban_dataset, extraction_function=urban_extractor, use_unsure=False
@@ -136,46 +139,20 @@ if __name__ == "__main__":
         extraction_function=mohammad_extractor,
         use_unsure=False,
     )
-    urban_train_data, urban_dev_data, urban_test_data = urban_data.get_splits(
-        splits=[0, 0.1, 0.9]
-    )
-    mohammad_train_data, mohammad_dev_data, mohammad_test_data = (
-        mohammad_data.get_splits(splits=[0, 0.1, 0.9])
-    )
-    bert_l8 = BertEmbeddings([8])
-    bert_l5_8 = BertEmbeddings(range(5, 9))
-    swow_bert = ContextualMaoModel(
-        dev_data=urban_dev_data,
-        test_data=urban_test_data,
-        candidate_source=swow_r1,
+    print("loading models")
+    wn_bert = ContextualMaoModel(
+        data=urban_data,
+        candidate_source=wn,
         mean_multi_word=True,
-        fit_embeddings=bert_l8,
-        score_embeddings=bert_l8,
-        comparing_phrase="reminds me of",
+        fit_embeddings=contextual_embeddings_l8,
+        score_embeddings=contextual_embeddings_l8,
+        restrict_pos=True,
     )
-    swow_bert.train_thresholds(0.01, 6)
-    swow_bert.evaluate_per_threshold(
-        swow_bert.decision_thresholds[0] - 0.25,
-        steps=11,
-        increment=0.05,
-        save_file="model_results/swow_bert_r1_l8.tsv",
-    )
-    swow_bert_2 = ContextualMaoModel(
-        dev_data=urban_dev_data,
-        test_data=urban_test_data,
-        candidate_source=swow_r1,
-        mean_multi_word=True,
-        fit_embeddings=bert_l5_8,
-        score_embeddings=bert_l5_8,
-        comparing_phrase="reminds me of",
-    )
-    swow_bert_2.train_thresholds(0.01, 6)
-    swow_bert_2.evaluate_per_threshold(
-        swow_bert_2.decision_thresholds[0] - 0.25,
-        steps=11,
-        increment=0.05,
-        save_file="model_results/swow_bert_r1_l5-8.tsv",
-    )
+    moment = time.time()
+    for i in range(10, 20):
+        wn_bert.predict(wn_bert.test_data[i])
+        print("took", time.time() - moment)
+        moment = time.time()
     # print("loading models")
     # swow_model_r1=MaoModel(dev_data=urban_dev_data,test_data=urban_test_data,candidate_source=swow_r1,mean_multi_word=False,embeddings=swow_embeddings_r1,use_output_vec=False)
     # swow_model_r12=MaoModel(dev_data=urban_dev_data,test_data=urban_test_data,candidate_source=swow_r12,mean_multi_word=False,embeddings=swow_embeddings_r12,use_output_vec=False)

@@ -37,10 +37,11 @@ class Embeddings:
             raise ValueError("None of the tokens are known")
         return np.mean(embeddings, axis=0)
 
-    def get_input_vector(self, token):
+    def get_input_vector(self, token, pos=None):
         """
         returns the standard embeddings
-        token: token for which embeddings are returned
+        :param token: token for which embeddings are returned
+        :param pos: part of speech of the token if known
         """
         return token
 
@@ -63,10 +64,11 @@ class FasttextModel(Embeddings):
         self.output_matrix = self.model.get_output_matrix()
         self.wn_interface = WordNetInterface()
 
-    def get_input_vector(self, token):
+    def get_input_vector(self, token, pos=None):
         """
         returns fasttext word embedding
-        token: word for which embedding is given
+        :param token: word for which embedding is given
+        :param pos: irrelevant
         """
         return self.model.get_word_vector(token)
 
@@ -163,10 +165,11 @@ class WordAssociationEmbeddings(Embeddings):
                 self.indices[line.strip()] = i
         self.embeddings = np.load(embedding_file)
 
-    def get_input_vector(self, token):
+    def get_input_vector(self, token, pos=None):
         """
         returns embedding for a given cue from the association strength matrix (mean pooling from neighbours if response and only cues are used)
         token: the cue for which embedding is given
+        :param pos: irrelevant
         """
         if token in self.indices:
             token_index = self.indices[token]
