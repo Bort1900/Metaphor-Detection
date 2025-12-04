@@ -93,12 +93,13 @@ class NThresholdModel:
         )
         return scores
 
-    def evaluate(self, data=None, save_file=None, by_pos=None):
+    def evaluate(self, data=None, save_file=None, by_pos=None, by_phrase=False):
         """
         returns a dictionary of recall, precision and f-score metrics after evaluating the model on test data
         :param data: test data for evaluation, defaults to test data
         :param save_file: filepath for possible storing
         :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
+        :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
         """
         if not data:
             data = self.test_data
@@ -108,7 +109,7 @@ class NThresholdModel:
             if by_pos and sentence.pos not in by_pos:
                 continue
             try:
-                prediction = int(self.predict(sentence))
+                prediction = int(self.predict(sentence, by_phrase=by_phrase))
             except ValueError:
                 # print(f"{sentence.target} not in dictionary, ignoring sentence")
                 ignore_count += 1
@@ -125,20 +126,21 @@ class NThresholdModel:
                 output.write(str(scores))
         return scores
 
-    def nfold_cross_validate(self, n, save_file=None, by_pos=None):
+    def nfold_cross_validate(self, n, save_file=None, by_pos=None, by_phrase=False):
         """
         performs nfold cross validation for the model and returns the mean evaluation measures
 
         :param n: number of splits
         :param save_file: filepath for possible storing
         :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
+        :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
         """
         mean_thresholds = [0 for _ in range(len(self.decision_thresholds))]
         output = dict()
         for i in range(n):
             test_split, train_split = self.data.get_ith_split(i, n)
-            self.train_thresholds(0.01, 5, train_split)
-            scores = self.evaluate(test_split, by_pos=by_pos)
+            self.train_thresholds(0.01, 5, train_split, by_phrase=by_phrase)
+            scores = self.evaluate(test_split, by_pos=by_pos, by_phrase=by_phrase)
             for j in range(len(mean_thresholds)):
                 mean_thresholds[j] += self.decision_thresholds[j]
             for measure in scores:
@@ -158,25 +160,27 @@ class NThresholdModel:
                 write_file.write(str(output))
         return scores
 
-    def predict(self, sentence):
+    def predict(self, sentence, by_phrase=False):
         """
         returns the class that the model predicts for a given instance
         :param sentence: instance to classify
+        :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
         """
         try:
-            similarity = self.get_compare_value(sentence)
+            similarity = self.get_compare_value(sentence, by_phrase=by_phrase)
         except ValueError:
             raise ValueError(f"{sentence.target} not in dictionary")
         scale = self.decision_thresholds + [similarity]
         scale.sort()
         return scale.index(similarity)
 
-    def get_compare_value(self, sentence):
+    def get_compare_value(self, sentence, by_phrase=False):
         """
         returns the value that is compared with the model's thresholds
         :param sentence: the instance that should be classified
+        :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
         """
-        predicted_sense = self.best_fit(sentence)
+        predicted_sense = self.best_fit(sentence, by_phrase=by_phrase)
         try:
             target_vector = self.score_embeddings.get_input_vector(sentence.target)
             if len(predicted_sense.split("_")) > 1 and self.mean_multi_word:
@@ -194,17 +198,23 @@ class NThresholdModel:
         elif type(target_vector) == torch.Tensor:
             return self.cos(target_vector, predicted_vector)
 
-    def best_fit(self, sentence):
+    def best_fit(self, sentence, by_phrase=False):
         """
         returns the best fiting instance from the candidate set to calculate the threshold
         :param sentence: the instance that should be classified
+        :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
         """
         candidate_set = self.candidate_source.get_candidate_set(
             sentence.target, pos=sentence.pos if self.restrict_pos else None
         )
         candidate_set.add(sentence.target_token)
         best_similarity = -1
-        context = [word for word in sentence.context if word.lower() not in self.stops]
+        if by_phrase and sentence.phrase != "unknown":
+            context = [word for word in sentence.phrase if word != sentence.target]
+        else:
+            context = [
+                word for word in sentence.context if word.lower() not in self.stops
+            ]
         context_vector = self.fit_embeddings.get_mean_vector(context)
         best_candidate = sentence.target
         for candidate in candidate_set:
@@ -241,7 +251,9 @@ class NThresholdModel:
                 best_candidate = candidate
         return best_candidate
 
-    def train_thresholds(self, increment, epochs, data=None, by_pos=None):
+    def train_thresholds(
+        self, increment, epochs, data=None, by_pos=None, by_phrase=False
+    ):
         """
         trains the model's threshold on the dev_data
 
@@ -249,6 +261,7 @@ class NThresholdModel:
         :param epochs: number of times the dev_data is run through the training process
         :param data: data to train on, defaults to dev data
         :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
+        :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
         """
         if not data:
             data = self.dev_data
@@ -267,8 +280,8 @@ class NThresholdModel:
                 if by_pos and sentence.pos not in by_pos:
                     continue
                 try:
-                    comp_value = self.get_compare_value(sentence)
-                    prediction = int(self.predict(sentence))
+                    comp_value = self.get_compare_value(sentence, by_phrase=by_phrase)
+                    prediction = int(self.predict(sentence, by_phrase=by_phrase))
                 except ValueError:
                     print(f"{sentence.target} not in dictionary, ignoring sentence")
                     continue
@@ -281,7 +294,9 @@ class NThresholdModel:
                 self.decision_thresholds.sort()
             print(f"Current Thresholds: {self.decision_thresholds}")
 
-    def evaluate_per_threshold(self, start, steps, increment, save_file, by_pos=None):
+    def evaluate_per_threshold(
+        self, start, steps, increment, save_file, by_pos=None, by_phrase=False
+    ):
         """
         writes some evaluation metrics into a file after evaluating the model with different thresholds
         :param start: the first threshold to test
@@ -289,6 +304,7 @@ class NThresholdModel:
         :param increment: the difference between two thresholds to test
         :param save_file: where to store the results
         :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
+        :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
         """
         if self.num_classes > 2:
             raise ValueError("only works for 2 classes")
@@ -298,24 +314,29 @@ class NThresholdModel:
                 "Threshold\tPrecision\tRecall\tF1(Class 1)\tF1(Class 2)\tF1(Macro-Average)\n"
             )
             for i in range(steps):
-                scores = self.evaluate(self.test_data, by_pos=by_pos)
+                scores = self.evaluate(
+                    self.test_data, by_pos=by_pos, by_phrase=by_phrase
+                )
                 output.write(
                     f"{round(self.decision_thresholds[0],2)}\t{round(scores["precision_class_0"],2)}\t{round(scores["recall_class_0"],2)}\t{round(scores["f_1_class_0"],2)}\t{round(scores["f_1_class_1"],2)}\t{round(scores["macro_f_1"],2)}\n"
                 )
                 self.decision_thresholds[0] += increment
 
-    def draw_distribution_per_class(self, save_file, labels, title, by_pos=None):
+    def draw_distribution_per_class(
+        self, save_file, labels, title, by_pos=None, by_phrase=False
+    ):
         """
         draws box plots of the distributions of the prediction scores for each of the classes
         :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
         :param save_file: where the plots are stored
+        :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
         """
         datapoints = [[] for _ in range(self.num_classes)]
         for sent in self.test_data:
             if by_pos and sent.pos not in by_pos:
                 continue
             try:
-                similarity = self.get_compare_value(sent)
+                similarity = self.get_compare_value(sent, by_phrase=by_phrase)
             except ValueError:
                 continue
             datapoints[sent.value].append(similarity.cpu())
@@ -474,20 +495,28 @@ class ContextualMaoModel(NThresholdModel):
         self.use_context_vec = use_context_vec
         self.cos = CosineSimilarity(dim=0, eps=1e-6)
 
-    def best_fit(self, sentence):
+    def best_fit(self, sentence, by_phrase=False):
         """
         returns the best candidate from the candidate set that fits into the sentence context
         :param sentence: sentence that will be predicted
+        :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
         """
         candidate_set = self.candidate_source.get_candidate_set(
             sentence.target, pos=sentence.pos if self.restrict_pos else None
         )
         candidate_set.add(sentence.target_token)
         best_similarity = -1
-        if self.use_context_vec:
-            compare_vector = self.fit_embeddings.get_context_vector(sentence)
+        if by_phrase and sentence.phrase != "unknown":
+            phrase = Sentence(sentence=sentence.phrase, target=sentence.target, value=1)
+            if self.use_context_vec:
+                compare_vector = self.fit_embeddings.get_context_vector(phrase)
+            else:
+                compare_vector = self.fit_embeddings.get_sentence_vector(phrase)
         else:
-            compare_vector = self.fit_embeddings.get_sentence_vector(sentence)
+            if self.use_context_vec:
+                compare_vector = self.fit_embeddings.get_context_vector(sentence)
+            else:
+                compare_vector = self.fit_embeddings.get_sentence_vector(sentence)
         best_candidate = sentence.target
         for candidate in candidate_set:
             if len(candidate.split("_")) > 1 and self.mean_multi_word:
