@@ -123,6 +123,14 @@ class SWOWInterface:
                     pairs_to_strength[(cue, response)] = self.get_relative_probability(
                         cue, response
                     )
+        for cue in self.cue_response_count:
+            total = 0
+            for response in self.cue_response_count[cue]:
+                if (cue, response) in pairs_to_strength:
+                    total += pairs_to_strength[(cue, response)]
+            for response in self.cue_response_count[cue]:
+                pairs_to_strength[(cue, response)] /= total
+
         return pairs_to_strength, cues_to_index, responses
 
     def read_in_pos_freq(self):
