@@ -129,7 +129,8 @@ class SWOWInterface:
                 if (cue, response) in pairs_to_strength:
                     total += pairs_to_strength[(cue, response)]
             for response in self.cue_response_count[cue]:
-                pairs_to_strength[(cue, response)] /= total
+                if (cue, response) in pairs_to_strength:
+                    pairs_to_strength[(cue, response)] /= total
 
         return pairs_to_strength, cues_to_index, responses
 
