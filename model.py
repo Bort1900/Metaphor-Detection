@@ -197,9 +197,13 @@ class NThresholdModel:
         except KeyError:
             raise ValueError(f"{sentence.target} not in dictionary")
         if type(target_vector) == np.ndarray:
-            return Vectors.cos_sim(target_vector, predicted_vector)
+            similarity = Vectors.cos_sim(target_vector, predicted_vector)
         elif type(target_vector) == torch.Tensor:
-            return self.cos(target_vector, predicted_vector)
+            similarity = self.cos(target_vector, predicted_vector)
+        if not similarity > 0 and not similarity < 0:
+            return 0
+        else:
+            return similarity
 
     def best_fit(self, sentence, by_phrase=False):
         """
@@ -347,7 +351,11 @@ class NThresholdModel:
                 similarity = self.get_compare_value(sent, by_phrase=by_phrase)
             except ValueError:
                 continue
-            datapoints[sent.value].append(similarity.cpu())
+            try:
+                datapoints[sent.value].append(similarity)
+            except TypeError:
+                datapoints[sent.value].append(similarity.cpu())
+        breakpoint()
         plt.boxplot(datapoints, labels=labels, orientation="horizontal")
         plt.title(title)
         plt.savefig(save_file, bbox_inches="tight")
