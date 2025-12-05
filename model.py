@@ -21,6 +21,7 @@ class NThresholdModel:
         score_embeddings,
         use_output_vec,
         restrict_pos,
+        apply_candidate_weight,
         num_classes=2,
     ):
         """
@@ -32,6 +33,7 @@ class NThresholdModel:
         :param score_embeddings: source for embeddings for scoring for prediction
         :param use_output_vec: whether output vectors(word2vec) should be used for comparing context to candidates
         :param restrict_pos: wether candidate sets should be retricted by target part of speech
+        :param apply_candidate_weight: whether the candidates should be weighed by association strength, needs SWOWInterface as candidate source
         :param num_classes: number of classes to classify
         """
         self.data = data
@@ -46,6 +48,7 @@ class NThresholdModel:
         self.decision_thresholds = [0.5 for i in range(num_classes - 1)]
         self.restrict_pos = restrict_pos
         self.num_classes = num_classes
+        self.apply_candidate_weight = apply_candidate_weight
         self.stops = stopwords.words("english")
 
     @staticmethod
@@ -245,6 +248,11 @@ class NThresholdModel:
                     # print(f"Word {candidate} not in dictionary, ignoring candidate")
                     continue
             similarity = Vectors.cos_sim(candidate_vector, context_vector)
+            if self.apply_candidate_weight:
+                weight = self.candidate_source.get_association_strength(
+                    candidate, sentence.target
+                )
+                similarity *= weight
 
             if similarity >= best_similarity:
                 best_similarity = similarity
@@ -356,6 +364,7 @@ class MaoModel(NThresholdModel):
         score_embeddings,
         restrict_pos,
         use_output_vec,
+        apply_candidate_weight,
     ):
         """
         Model that works like the model from the Mao(2018) paper, see NThresholdModel
@@ -366,6 +375,7 @@ class MaoModel(NThresholdModel):
         :param score_embeddings: source for embeddings for scoring for prediction
         :param restrict_pos: wether candidate sets should be retricted by target part of speech
         :param use_output_vec: whether ouput vectors(word2vec) should be used for comparing context to candidates
+        :param apply_candidate_weight: whether the candidates should be weighed by association strength, needs SWOWInterface as candidate source
         """
         super().__init__(
             data=data,
@@ -375,6 +385,7 @@ class MaoModel(NThresholdModel):
             score_embeddings=score_embeddings,
             restrict_pos=restrict_pos,
             use_output_vec=use_output_vec,
+            apply_candidate_weight=apply_candidate_weight,
         )
 
     def train_threshold(self, increment, epochs, batch_size=-1):
@@ -470,6 +481,7 @@ class ContextualMaoModel(NThresholdModel):
         score_embeddings,
         restrict_pos,
         use_context_vec,
+        apply_candidate_weight,
         num_classes=2,
     ):
         """
@@ -480,6 +492,7 @@ class ContextualMaoModel(NThresholdModel):
         :param embeddings: source for embeddings for comparing
         :param use_context_vec: whether context vector should be used for comparing context to candidates instead of target word in context
         :param restrict_pos: wether candidate sets should be retricted by target part of speech
+        :param apply_candidate_weight: whether the candidates should be weighed by association strength, needs SWOWInterface as candidate source
         :param num_classes: number of classes to classify
         """
         super().__init__(
@@ -490,6 +503,7 @@ class ContextualMaoModel(NThresholdModel):
             score_embeddings=score_embeddings,
             use_output_vec=False,
             restrict_pos=restrict_pos,
+            apply_candidate_weight=apply_candidate_weight,
             num_classes=num_classes,
         )
         self.use_context_vec = use_context_vec
@@ -528,6 +542,12 @@ class ContextualMaoModel(NThresholdModel):
                     candidate, pos=sentence.pos
                 )
             similarity = self.cos(candidate_vector, compare_vector)
+            if self.apply_candidate_weight:
+                weight = self.candidate_source.get_association_strength(
+                    candidate, sentence.target
+                )
+                similarity *= weight
+
             if similarity >= best_similarity:
                 best_similarity = similarity
                 best_candidate = candidate
@@ -559,6 +579,7 @@ class ComparingModel(NThresholdModel):
             score_embeddings=associative_embeddings,
             use_output_vec=use_output_vec,
             restrict_pos=False,
+            apply_candidate_weight=False,
             num_classes=num_classes,
         )
         self.literal_embeddings = literal_embeddings
@@ -708,6 +729,7 @@ class RandomBaseline(NThresholdModel):
             fit_embeddings=score_embeddings,
             use_output_vec=False,
             restrict_pos=restrict_pos,
+            apply_candidate_weight=False,
             num_classes=num_classes,
         )
 
