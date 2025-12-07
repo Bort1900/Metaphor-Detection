@@ -37,7 +37,8 @@ class NThresholdModel:
         :param num_classes: number of classes to classify
         """
         self.data = data
-        split = self.data.get_splits(splits=[0, 0.1, 0.9])
+        split = self.data.get_splits(splits=[0.1, 0.1, 0.8])
+        self.train_data = split[0]
         self.dev_data = split[1]
         self.test_data = split[2]
         self.candidate_source = candidate_source
@@ -276,7 +277,7 @@ class NThresholdModel:
         :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
         """
         if not data:
-            data = self.dev_data
+            data = self.train_data
         data_per_class = [
             [sentence for sentence in self.dev_data if sentence.value == i]
             for i in range(self.num_classes)
