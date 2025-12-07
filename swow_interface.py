@@ -311,6 +311,7 @@ class SWOWInterface:
                     if not pos or pos == self.get_pos(cue)
                 ]
             )
+        output.add(word)
         return output.difference(self.stops)
 
     def get_weighted_neighbours(self, token):
