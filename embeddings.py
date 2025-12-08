@@ -307,5 +307,6 @@ class BertEmbeddings(Embeddings):
                     embeddings.append(self.get_sentence_vector(token_sent))
                 except KeyError:
                     continue
-
+        if len(embeddings) == 0:
+            return self.get_sentence_vector(sentence)
         return torch.stack(embeddings).mean(dim=0)
