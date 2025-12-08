@@ -352,10 +352,11 @@ class NThresholdModel:
                 similarity = self.get_compare_value(sent, by_phrase=by_phrase)
             except ValueError:
                 continue
-            try:
-                datapoints[sent.value].append(similarity)
-            except TypeError:
+            if type(similarity)==torch.Tensor:
                 datapoints[sent.value].append(similarity.cpu())
+            else:
+                datapoints[sent.value].append(similarity)
+                
         breakpoint()
         plt.boxplot(datapoints, labels=labels, orientation="horizontal")
         plt.title(title)
