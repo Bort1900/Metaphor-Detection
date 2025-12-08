@@ -84,7 +84,7 @@ class NThresholdModel:
                 )
 
         scores["macro_f_1"] = (
-            sum([scores[f"f_1_class_{i}"] for i in range(num_classes)]) / 2
+            sum([scores[f"f_1_class_{i}"] for i in range(num_classes)]) / num_classes
         )
         scores["micro_f_1"] = float(
             sum(
