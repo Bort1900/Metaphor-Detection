@@ -147,5 +147,6 @@ class Vectors:
         """
         denominator = np.linalg.norm(vec1) * np.linalg.norm(vec2)
         if denominator == 0:
-            breakpoint()
+            #breakpoint()
+            return 0
         return float(np.dot(vec1, vec2) / denominator)
