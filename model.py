@@ -32,7 +32,7 @@ class NThresholdModel:
         :param fit_embeddings: source for embeddings for finding best fit candidate
         :param score_embeddings: source for embeddings for scoring for prediction
         :param use_output_vec: whether output vectors(word2vec) should be used for comparing context to candidates
-        :param restrict_pos: wether candidate sets should be retricted by target part of speech
+        :param restrict_pos: list of parts of speech to restrict the candidate set to
         :param apply_candidate_weight: whether the candidates should be weighed by association strength, needs SWOWInterface as candidate source
         :param num_classes: number of classes to classify
         """
@@ -213,7 +213,7 @@ class NThresholdModel:
         :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
         """
         candidate_set = self.candidate_source.get_candidate_set(
-            sentence.target, pos=sentence.pos if self.restrict_pos else None
+            sentence.target, pos=self.restrict_pos
         )
         candidate_set.add(sentence.target_token)
         best_similarity = -1
@@ -424,7 +424,7 @@ class MaoModel(NThresholdModel):
         :param mean_multi_word: whether embeddings for multi-word tokens should be mean pooled from the embeddings of the individual words
         :param fit_embeddings: source for embeddings for finding best fit candidate
         :param score_embeddings: source for embeddings for scoring for prediction
-        :param restrict_pos: wether candidate sets should be retricted by target part of speech
+        :param restrict_pos: list of parts of speech the to which candidate sets should be retricted 
         :param use_output_vec: whether ouput vectors(word2vec) should be used for comparing context to candidates
         :param apply_candidate_weight: whether the candidates should be weighed by association strength, needs SWOWInterface as candidate source
         """
@@ -542,7 +542,7 @@ class ContextualMaoModel(NThresholdModel):
         :param mean_multi_word: whether embeddings for multi-word tokens should be mean pooled from the embeddings of the individual words
         :param embeddings: source for embeddings for comparing
         :param use_context_vec: whether context vector should be used for comparing context to candidates instead of target word in context
-        :param restrict_pos: wether candidate sets should be retricted by target part of speech
+        :param restrict_pos: list of parts of speech to which candidate sets should be retricted
         :param apply_candidate_weight: whether the candidates should be weighed by association strength, needs SWOWInterface as candidate source
         :param num_classes: number of classes to classify
         """
@@ -567,7 +567,7 @@ class ContextualMaoModel(NThresholdModel):
         :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
         """
         candidate_set = self.candidate_source.get_candidate_set(
-            sentence.target, pos=sentence.pos if self.restrict_pos else None
+            sentence.target, pos=self.restrict_pos 
         )
         candidate_set.add(sentence.target_token)
         best_similarity = -1
@@ -769,7 +769,7 @@ class RandomBaseline(NThresholdModel):
         :param data: list of Sentence instances to train thresholds and evaluate model
         :param candidate_source: an object with a get_candidate_set function
         :param embeddings: source for embeddings for comparing
-        :param restrict_pos: wether candidate sets should be retricted by target part of speech
+        :param restrict_pos: list of parts of speech to which candidate sets should be restricted 
         :param num_classes: number of classes for prediction
         """
         super().__init__(
@@ -790,7 +790,7 @@ class RandomBaseline(NThresholdModel):
         sentence: Sentence instance the model will predict
         """
         candidate_set = self.candidate_source.get_candidate_set(
-            sentence.target, pos=sentence.pos if self.restrict_pos else None
+            sentence.target, pos=self.restrict_pos
         )
         candidate_set.add(sentence.target_token)
         return random.choice(list(candidate_set))

@@ -154,7 +154,7 @@ class WordNetInterface:
         gets all the synonymic and hypernymic synsets from wordnet and returns a set of their lemmas and the token
 
         :param token: the word for which the candidate set is generated
-        :param pos: if specified the candidates will be restricted to this part of speech(v:verb,n:noun,a:adjective)
+        :param pos: list of parts of speech, if specified the candidates will be restricted to these parts of speech(v:verb,n:noun,a:adjective)
         """
         candidates = set()
         candidates.update(self.get_synonyms(token, pos=pos))

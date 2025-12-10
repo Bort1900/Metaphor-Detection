@@ -290,7 +290,7 @@ class SWOWInterface:
     def get_candidate_set(self, word, pos=None):
         """
         returns all the responses given to the word and all the cues the word was given as a response to
-        pos: restricts result to a certain part of speech if given(v:verb,n:noun,a:adjective)
+        :param pos: list of parts of speech, restricts result to a certain part of speech if given(v:verb,n:noun,a:adjective)
         """
         output = set()
         if word in self.cues_to_responses:
@@ -299,7 +299,7 @@ class SWOWInterface:
                     response
                     for response in self.cues_to_responses[word]
                     if self.get_num_occurrences(word, response) >= self.candidate_cap
-                    if not pos or pos == self.get_pos(response)
+                    if not pos or self.get_pos(response) in pos
                 ]
             )
         if word in self.responses_to_cues:
@@ -308,7 +308,7 @@ class SWOWInterface:
                     cue
                     for cue in self.responses_to_cues[word]
                     if self.get_num_occurrences(cue, word) >= self.candidate_cap
-                    if not pos or pos == self.get_pos(cue)
+                    if not pos or self.get_pos(cue) in pos
                 ]
             )
         output.add(word)
