@@ -309,7 +309,7 @@ class NThresholdModel:
             print(f"Current Thresholds: {self.decision_thresholds}")
             for i in range(len(self.decision_thresholds)):
                 mean_thresholds[i] += self.decision_thresholds[i]
-        self.decision_thresholds = [threshold/epochs for threshold in mean_thresholds]
+        self.decision_thresholds = [threshold / epochs for threshold in mean_thresholds]
         print(f"Mean Thresholds: {self.decision_thresholds}")
 
     def evaluate_per_threshold(
@@ -341,14 +341,30 @@ class NThresholdModel:
                 self.decision_thresholds[0] += increment
 
     def draw_distribution_per_class(
-        self, save_file, labels, title, by_pos=None, by_phrase=False
+        self,
+        save_file,
+        labels,
+        title,
+        by_pos=None,
+        by_phrase=False,
+        graph_type="boxplot",
     ):
         """
         draws box plots of the distributions of the prediction scores for each of the classes
         :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
         :param save_file: where the plots are stored
         :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
+        :param graph_type: boxplot or scatter, how the distribution will be displayed
         """
+        colors = [
+            "#56B4E9",
+            "#E69F00",
+            "#009E73",
+            "#F0E442",
+            "#0072B2",
+            "#D55E00",
+            "#CC79A7",
+        ]
         datapoints = [[] for _ in range(self.num_classes)]
         for sent in self.test_data:
             if by_pos and sent.pos not in by_pos:
@@ -361,9 +377,29 @@ class NThresholdModel:
                 datapoints[sent.value].append(similarity.cpu())
             else:
                 datapoints[sent.value].append(similarity)
+        fig, ax = plt.subplots()
+        print(datapoints)
+        if graph_type == "boxplot":
+            ax.boxplot(datapoints, labels=labels, orientation="horizontal")
+        elif graph_type == "scatter":
+            for i in range(self.num_classes):
+                ax.scatter(
+                    np.random.rand(len(datapoints[i]))  - 0.5,
+                    datapoints[i],
+                    color=colors[i],
+                    label=labels[i],
+                    marker="x",
+                )
+                                
+                ax.spines["left"].set_position(("data",0))
+                ax.spines["right"].set_visible(False)
+                ax.spines["top"].set_visible(False)
+                plt.xlim(-1,1)
+                plt.xticks([])
+                plt.legend()
+        else:
+            raise ValueError("graph type must be scatter or boxplot")
 
-        breakpoint()
-        plt.boxplot(datapoints, labels=labels, orientation="horizontal")
         plt.title(title)
         plt.savefig(save_file, bbox_inches="tight")
         plt.close()
