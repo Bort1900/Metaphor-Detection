@@ -283,6 +283,7 @@ class NThresholdModel:
             for i in range(self.num_classes)
         ]
         num_per_class = math.floor(len(self.dev_data) / self.num_classes)
+        mean_thresholds = [0 for _ in range(len(self.decision_thresholds))]
         for epoch in range(epochs):
             print(f"Epoch {epoch+1}")
             data = []
@@ -306,6 +307,10 @@ class NThresholdModel:
                             self.decision_thresholds[i] -= increment
                 self.decision_thresholds.sort()
             print(f"Current Thresholds: {self.decision_thresholds}")
+            for i in range(len(self.decision_thresholds)):
+                mean_thresholds[i] += self.decision_thresholds[i]
+        self.decision_thresholds = [threshold/epochs for threshold in mean_thresholds]
+        print(f"Mean Thresholds: {self.decision_thresholds}")
 
     def evaluate_per_threshold(
         self, start, steps, increment, save_file, by_pos=None, by_phrase=False
@@ -352,11 +357,11 @@ class NThresholdModel:
                 similarity = self.get_compare_value(sent, by_phrase=by_phrase)
             except ValueError:
                 continue
-            if type(similarity)==torch.Tensor:
+            if type(similarity) == torch.Tensor:
                 datapoints[sent.value].append(similarity.cpu())
             else:
                 datapoints[sent.value].append(similarity)
-                
+
         breakpoint()
         plt.boxplot(datapoints, labels=labels, orientation="horizontal")
         plt.title(title)

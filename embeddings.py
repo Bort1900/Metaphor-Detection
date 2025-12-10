@@ -307,6 +307,7 @@ class BertEmbeddings(Embeddings):
                     embeddings.append(self.get_sentence_vector(token_sent))
                 except KeyError:
                     continue
+        # sentence context might only contain stopwords
         if len(embeddings) == 0:
             return self.get_sentence_vector(sentence)
         return torch.stack(embeddings).mean(dim=0)
