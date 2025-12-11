@@ -157,8 +157,13 @@ class WordNetInterface:
         :param pos: list of parts of speech, if specified the candidates will be restricted to these parts of speech(v:verb,n:noun,a:adjective)
         """
         candidates = set()
-        candidates.update(self.get_synonyms(token, pos=pos))
-        candidates.update(set(self.get_hypernyms(token, pos=pos)))
+        if pos:
+            for part in pos:
+                candidates.update(self.get_synonyms(token, pos=part))
+                candidates.update(set(self.get_hypernyms(token, pos=part)))
+        else:
+            candidates.update(self.get_synonyms(token))
+            candidates.update(set(self.get_hypernyms(token)))
         candidates.difference_update(self.stops)
         candidates.add(token)
         return candidates
