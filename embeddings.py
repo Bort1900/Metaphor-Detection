@@ -297,11 +297,8 @@ class BertEmbeddings(Embeddings):
         embeddings = []
         for i, token in enumerate(sentence.tokens):
             if i != sentence.target_index and token.lower() not in self.stops:
-                token_sent = Sentence(
-                    sentence=sentence.sentence,
-                    target=token,
-                    value=sentence.value,
-                    phrase=sentence.phrase,
+                token_sent = sentence.change_target(
+                    new_target=token, new_target_index=i
                 )
                 try:
                     embeddings.append(self.get_sentence_vector(token_sent))

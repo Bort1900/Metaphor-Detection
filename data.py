@@ -43,6 +43,26 @@ class Sentence:
                 self.tokens[: self.target_index] + self.tokens[self.target_index + 1 :]
             )
 
+    def change_target(self, new_target, new_pos=None, new_target_index=None):
+        """
+        returns a new Sentence instance with the position that is marked as the target changed
+
+        :param new_target: token that should now be the target
+        :param new_pos: part of speech of the new target
+        :param new_target_index: index of the new target
+        """
+
+        new_sent = Sentence(
+            sentence=self.sentence,
+            target=new_target,
+            value=self.value,
+            phrase=self.phrase,
+            pos=new_pos,
+        )
+        if new_target_index:
+            new_sent.target_index = new_target_index
+        return new_sent
+
     def replace_target(self, new_target, split_multi_word=True, target_index=-1):
         """
         returns a new Sentence instance where the target is replaced by another word
@@ -147,6 +167,6 @@ class Vectors:
         """
         denominator = np.linalg.norm(vec1) * np.linalg.norm(vec2)
         if denominator == 0:
-            #breakpoint()
+            # breakpoint()
             return 0
         return float(np.dot(vec1, vec2) / denominator)
