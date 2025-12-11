@@ -20,8 +20,8 @@ class NThresholdModel:
         fit_embeddings,
         score_embeddings,
         use_output_vec,
-        restrict_pos,
         apply_candidate_weight,
+        restrict_pos=None,
         num_classes=2,
     ):
         """
@@ -378,23 +378,22 @@ class NThresholdModel:
             else:
                 datapoints[sent.value].append(similarity)
         fig, ax = plt.subplots()
-        print(datapoints)
         if graph_type == "boxplot":
             ax.boxplot(datapoints, labels=labels, orientation="horizontal")
         elif graph_type == "scatter":
             for i in range(self.num_classes):
                 ax.scatter(
-                    np.random.rand(len(datapoints[i]))  - 0.5,
+                    np.random.rand(len(datapoints[i])) - 0.5,
                     datapoints[i],
                     color=colors[i],
                     label=labels[i],
                     marker="x",
                 )
-                                
-                ax.spines["left"].set_position(("data",0))
+
+                ax.spines["left"].set_position(("data", 0))
                 ax.spines["right"].set_visible(False)
                 ax.spines["top"].set_visible(False)
-                plt.xlim(-1,1)
+                plt.xlim(-1, 1)
                 plt.xticks([])
                 plt.legend()
         else:
@@ -413,9 +412,9 @@ class MaoModel(NThresholdModel):
         mean_multi_word,
         fit_embeddings,
         score_embeddings,
-        restrict_pos,
         use_output_vec,
         apply_candidate_weight,
+        restrict_pos=None,
     ):
         """
         Model that works like the model from the Mao(2018) paper, see NThresholdModel
@@ -424,7 +423,7 @@ class MaoModel(NThresholdModel):
         :param mean_multi_word: whether embeddings for multi-word tokens should be mean pooled from the embeddings of the individual words
         :param fit_embeddings: source for embeddings for finding best fit candidate
         :param score_embeddings: source for embeddings for scoring for prediction
-        :param restrict_pos: list of parts of speech the to which candidate sets should be retricted 
+        :param restrict_pos: list of parts of speech the to which candidate sets should be retricted
         :param use_output_vec: whether ouput vectors(word2vec) should be used for comparing context to candidates
         :param apply_candidate_weight: whether the candidates should be weighed by association strength, needs SWOWInterface as candidate source
         """
@@ -530,9 +529,9 @@ class ContextualMaoModel(NThresholdModel):
         mean_multi_word,
         fit_embeddings,
         score_embeddings,
-        restrict_pos,
         use_context_vec,
         apply_candidate_weight,
+        restrict_pos=None,
         num_classes=2,
     ):
         """
@@ -567,7 +566,7 @@ class ContextualMaoModel(NThresholdModel):
         :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
         """
         candidate_set = self.candidate_source.get_candidate_set(
-            sentence.target, pos=self.restrict_pos 
+            sentence.target, pos=self.restrict_pos
         )
         candidate_set.add(sentence.target_token)
         best_similarity = -1
@@ -629,7 +628,6 @@ class ComparingModel(NThresholdModel):
             fit_embeddings=literal_embeddings,
             score_embeddings=associative_embeddings,
             use_output_vec=use_output_vec,
-            restrict_pos=False,
             apply_candidate_weight=False,
             num_classes=num_classes,
         )
@@ -761,7 +759,7 @@ class RandomBaseline(NThresholdModel):
         data,
         candidate_source,
         score_embeddings,
-        restrict_pos,
+        restrict_pos=None,
         num_classes=2,
     ):
         """
@@ -769,7 +767,7 @@ class RandomBaseline(NThresholdModel):
         :param data: list of Sentence instances to train thresholds and evaluate model
         :param candidate_source: an object with a get_candidate_set function
         :param embeddings: source for embeddings for comparing
-        :param restrict_pos: list of parts of speech to which candidate sets should be restricted 
+        :param restrict_pos: list of parts of speech to which candidate sets should be restricted
         :param num_classes: number of classes for prediction
         """
         super().__init__(
