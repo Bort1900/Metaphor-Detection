@@ -531,6 +531,8 @@ class ContextualMaoModel(NThresholdModel):
         score_embeddings,
         use_context_vec,
         apply_candidate_weight,
+        use_phrase_embedding,
+        mean_weights=None,
         restrict_pos=None,
         num_classes=2,
     ):
@@ -542,6 +544,8 @@ class ContextualMaoModel(NThresholdModel):
         :param embeddings: source for embeddings for comparing
         :param use_context_vec: whether context vector should be used for comparing context to candidates instead of target word in context
         :param restrict_pos: list of parts of speech to which candidate sets should be retricted
+        :param use_phrase_embedding: whether to generate embedding for whole phrase or just target word, also specifies the meaning method: "mean","weighted","max","concat", if "weighted" needs to specify weights as "mean_weights"
+        :param mean_weights: weights for verb and object embeddings for weighted mean when using "weighted" as phrase_embedding
         :param apply_candidate_weight: whether the candidates should be weighed by association strength, needs SWOWInterface as candidate source
         :param num_classes: number of classes to classify
         """
@@ -557,6 +561,8 @@ class ContextualMaoModel(NThresholdModel):
             num_classes=num_classes,
         )
         self.use_context_vec = use_context_vec
+        self.use_phrase_embedding = use_phrase_embedding
+        self.mean_weights = mean_weights
         self.cos = CosineSimilarity(dim=0, eps=1e-6)
 
     def best_fit(self, sentence, by_phrase=False):

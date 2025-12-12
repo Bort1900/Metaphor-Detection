@@ -43,7 +43,7 @@ class Sentence:
                 self.tokens[: self.target_index] + self.tokens[self.target_index + 1 :]
             )
 
-    def change_target(self, new_target, new_pos=None, new_target_index=None):
+    def change_target(self, new_target, new_pos=None, new_target_index=-1):
         """
         returns a new Sentence instance with the position that is marked as the target changed
 
@@ -59,7 +59,7 @@ class Sentence:
             phrase=self.phrase,
             pos=new_pos,
         )
-        if new_target_index:
+        if new_target_index >= 0:
             new_sent.target_index = new_target_index
         return new_sent
 
