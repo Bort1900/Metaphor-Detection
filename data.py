@@ -56,7 +56,6 @@ class Sentence:
             sentence=self.sentence,
             target=new_target,
             value=self.value,
-            phrase=self.phrase,
             pos=new_pos,
         )
         if new_target_index >= 0:
