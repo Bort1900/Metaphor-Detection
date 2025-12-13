@@ -193,10 +193,13 @@ class WordAssociationEmbeddings(Embeddings):
 
 
 class BertEmbeddings(Embeddings):
-    def __init__(self, layers):
+    def __init__(self, layers, use_phrase_embedding=None, mean_weights=None):
         """
         Wrapper for Bert Embeddings
         layer: list of which layer(s) of the hidden layers to use as embeddings
+        :param use_phrase_embedding: whether to generate embedding for whole phrase or just target word, also specifies the meaning method: "mean","weighted","max","concat", if "weighted" needs to specify weights as "mean_weights"
+        :param mean_weights: weights for verb and object embeddings for weighted mean when using "weighted" as phrase_embedding
+
         """
         self.layers = layers
         self.model = BertModel.from_pretrained(
@@ -209,12 +212,16 @@ class BertEmbeddings(Embeddings):
             self.model.to("cuda")
         self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
         self.lookup_table = dict()
+        self.use_phrase_embedding = use_phrase_embedding
+        self.mean_weights = mean_weights
 
     def get_sentence_vector(self, sentence):
         """
         returns contextual Bert embedding for the sentence target
         sentence: Sentence instance for whose target the embedding is given
         """
+        if self.use_phrase_embedding and sentence.phrase != "unknown":
+            return self.get_phrase_embedding(sentence)
         tokenized = self.tokenizer(sentence.sentence, return_tensors="pt")
         if torch.cuda.is_available():
             tokenized.to("cuda")
@@ -235,6 +242,44 @@ class BertEmbeddings(Embeddings):
                     for layer in self.layers
                 ]
             ).mean(dim=0)
+
+    def get_phrase_embedding(self, sentence):
+        """
+        returns the embedding of the sentence phrase according to the specified mean method
+
+        :param sentence: sentence that will be predicted
+        """
+        if sentence.phrase == "unknown":
+            return self.get_sentence_vector(sentence)
+        phrase = sentence.phrase.split()
+        verb_sentence = sentence.change_target(new_target=phrase[0], new_pos="v")
+        noun_sentence = sentence.change_target(new_target=phrase[1], new_pos="n")
+        verb_embedding = self.get_sentence_vector(verb_sentence)
+        noun_embedding = self.get_sentence_vector(noun_sentence)
+        if self.use_phrase_embedding == "mean":
+            phrase_embedding = torch.stack([verb_embedding, noun_embedding]).mean(dim=0)
+        elif self.use_phrase_embedding == "weighted":
+            if len(self.mean_weights) != 2:
+                raise ValueError(
+                    "must specify weights for verb and object as mean_weights"
+                )
+            phrase_embedding = torch.stack(
+                [
+                    verb_embedding * self.mean_weights[0],
+                    noun_embedding * self.mean_weights[1],
+                ]
+            ).sum(dim=0) / sum(self.mean_weights)
+        elif self.use_phrase_embedding == "max":
+            stacked = torch.stack([verb_embedding, noun_embedding])
+            abs_values, indices = stacked.abs().max(dim=0)
+            phrase_embedding = stacked.gather(0, indices.unsqueeze(0)).squeeze(0)
+        elif self.use_phrase_embedding == "concat":
+            phrase_embedding = torch.concat((verb_embedding, noun_embedding))
+        else:
+            raise ValueError(
+                "use_phrase_embedding must be one of 'mean', 'weighted', 'max', 'concat'"
+            )
+        return phrase_embedding
 
     def get_mean_vector(self, tokens, use_output_vecs=True):
         """

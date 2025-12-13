@@ -531,8 +531,6 @@ class ContextualMaoModel(NThresholdModel):
         score_embeddings,
         use_context_vec,
         apply_candidate_weight,
-        use_phrase_embedding,
-        mean_weights=None,
         restrict_pos=None,
         num_classes=2,
     ):
@@ -544,8 +542,6 @@ class ContextualMaoModel(NThresholdModel):
         :param embeddings: source for embeddings for comparing
         :param use_context_vec: whether context vector should be used for comparing context to candidates instead of target word in context
         :param restrict_pos: list of parts of speech to which candidate sets should be retricted
-        :param use_phrase_embedding: whether to generate embedding for whole phrase or just target word, also specifies the meaning method: "mean","weighted","max","concat", if "weighted" needs to specify weights as "mean_weights"
-        :param mean_weights: weights for verb and object embeddings for weighted mean when using "weighted" as phrase_embedding
         :param apply_candidate_weight: whether the candidates should be weighed by association strength, needs SWOWInterface as candidate source
         :param num_classes: number of classes to classify
         """
@@ -561,21 +557,15 @@ class ContextualMaoModel(NThresholdModel):
             num_classes=num_classes,
         )
         self.use_context_vec = use_context_vec
-        self.use_phrase_embedding = use_phrase_embedding
-        self.mean_weights = mean_weights
         self.cos = CosineSimilarity(dim=0, eps=1e-6)
 
-    def best_fit(self, sentence, by_phrase=False):
+    def get_compare_embedding(self, sentence, by_phrase=False):
         """
-        returns the best candidate from the candidate set that fits into the sentence context
+        returns the vector to which the candidates will be compared
+
         :param sentence: sentence that will be predicted
         :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
         """
-        candidate_set = self.candidate_source.get_candidate_set(
-            sentence.target, pos=self.restrict_pos
-        )
-        candidate_set.add(sentence.target_token)
-        best_similarity = -1
         if by_phrase and sentence.phrase != "unknown":
             phrase = Sentence(sentence=sentence.phrase, target=sentence.target, value=1)
             if self.use_context_vec:
@@ -587,6 +577,21 @@ class ContextualMaoModel(NThresholdModel):
                 compare_vector = self.fit_embeddings.get_context_vector(sentence)
             else:
                 compare_vector = self.fit_embeddings.get_sentence_vector(sentence)
+        return compare_vector
+
+    
+    def best_fit(self, sentence, by_phrase=False):
+        """
+        returns the best candidate from the candidate set that fits into the sentence context
+        :param sentence: sentence that will be predicted
+        :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
+        """
+        candidate_set = self.candidate_source.get_candidate_set(
+            sentence.target, pos=self.restrict_pos
+        )
+        candidate_set.add(sentence.target_token)
+        best_similarity = -1
+        compare_vector = self.get_compare_embedding(sentence, by_phrase)
         best_candidate = sentence.target
         for candidate in candidate_set:
             if len(candidate.split("_")) > 1 and self.mean_multi_word:
@@ -597,6 +602,8 @@ class ContextualMaoModel(NThresholdModel):
                 candidate_vector = self.fit_embeddings.get_input_vector(
                     candidate, pos=sentence.pos
                 )
+            if self.fit_embeddings.use_phrase_embedding=="concat":
+                candidate_vector=torch.concat((candidate_vector,candidate_vector))
             similarity = self.cos(candidate_vector, compare_vector)
             if self.apply_candidate_weight:
                 weight = self.candidate_source.get_association_strength(
