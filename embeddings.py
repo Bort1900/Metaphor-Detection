@@ -306,7 +306,7 @@ class BertEmbeddings(Embeddings):
             return self.lookup_table[(token, pos)]
         sentences = []
         for synset in wn.synsets(token):
-            if not pos or synset.pos() in pos:
+            if not pos or synset.pos() == pos:
                 for example in synset.examples():
 
                     try:
