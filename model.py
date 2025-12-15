@@ -185,6 +185,8 @@ class NThresholdModel:
         :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
         """
         predicted_sense = self.best_fit(sentence, by_phrase=by_phrase)
+        if predicted_sense==sentence.target:
+            return 1
         try:
             target_vector = self.score_embeddings.get_input_vector(sentence.target)
             if len(predicted_sense.split("_")) > 1 and self.mean_multi_word:
