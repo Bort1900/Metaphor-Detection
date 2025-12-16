@@ -340,9 +340,13 @@ class SWOWInterface:
             for neighbour in neighbours
         }
 
-    def get_association_strength(self, word_1, word_2):
+    def get_association_strength(
+        self, word_1: str, word_2: str, directional=False
+    ) -> float:
         """
-        returns the association strength of the two words in the bidirectional word association graph
+        returns the association strength of the two words  word association graph
+
+        :param directional: whether both direction's weights should be added
         """
         strength = 0
         if (
@@ -353,7 +357,8 @@ class SWOWInterface:
         cue_index = self.combined_cue_response_indices[word_1]
         response_index = self.combined_cue_response_indices[word_2]
         strength += self.association_strength_matrix[cue_index, response_index]
-        strength += self.association_strength_matrix[response_index, cue_index]
+        if directional:
+            strength += self.association_strength_matrix[response_index, cue_index]
         return strength
 
     def get_association_strength_matrix(self, use_only_cues=True):
