@@ -369,3 +369,10 @@ class SWOWInterface:
             )
         else:
             return self.association_strength_matrix, self.combined_cue_response_indices
+
+    def get_nodes(self, only_cues=False):
+        """
+        Returns all the nodes in the word association graph
+
+        :param only_cues: Whether only cues or also responses should be given out
+        """
