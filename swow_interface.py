@@ -290,7 +290,7 @@ class SWOWInterface:
     def get_neighbours(self, word, directional=False):
         """
         returns all the neighbours to the word in the word association graph
-        :param directional: whether the neighbours that are cues to the word should be given in addition to the responses
+        :param directional: whether the neighbours that are cues to the word should be given in addition to the responses, True: only responses
         """
         output = []
         if word in self.cues_to_responses:
@@ -300,7 +300,7 @@ class SWOWInterface:
                 if self.get_num_occurrences(word, response) >= self.candidate_cap
             ]
 
-        if word in self.responses_to_cues and directional:
+        if word in self.responses_to_cues and not directional:
             output += [
                 cue
                 for cue in self.responses_to_cues[word]
@@ -317,7 +317,7 @@ class SWOWInterface:
         output = set(
             [
                 token
-                for token in self.get_neighbours(word, directional=True)
+                for token in self.get_neighbours(word, directional=False)
                 if not pos or self.get_pos(token) in pos
             ]
         )
@@ -328,7 +328,7 @@ class SWOWInterface:
         """
         returns a dictionary that gives the association strength for all neighbours of the token in the word association graph
         """
-        neighbours = self.get_neighbours(token, directional=True)
+        neighbours = self.get_neighbours(token, directional=False)
         total_strength = np.array(
             [
                 self.get_association_strength(token, candidate)
@@ -346,7 +346,7 @@ class SWOWInterface:
         """
         returns the association strength of the two words  word association graph
 
-        :param directional: whether both direction's weights should be added
+        :param directional: whether both direction's weights should be added, True: just one direction
         """
         strength = 0
         if (
@@ -357,7 +357,7 @@ class SWOWInterface:
         cue_index = self.combined_cue_response_indices[word_1]
         response_index = self.combined_cue_response_indices[word_2]
         strength += self.association_strength_matrix[cue_index, response_index]
-        if directional:
+        if not directional:
             strength += self.association_strength_matrix[response_index, cue_index]
         return strength
 
