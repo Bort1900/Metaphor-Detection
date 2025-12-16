@@ -16,6 +16,14 @@ class SWOWInterface:
         use_ppmi=False,
         candidate_cap=0,
     ):
+        """
+        Interface for the Small World of Words Word Association Data by Simon De Deyne that can give out candidate sets for words
+        the data consists of cues where people have given three responses they associate with the cue word
+        number_of_responses: the number of responses (max 3) to take into account
+        strength_file: if exists a tsv file with the columns cue, response, number of mentions, total number of responses to the cue, association strength, if None it will be generated
+        use_ppmi: whether to use pointwise mutual information as a measure for the association strength when there is no strength file
+        candidate_cap: number of occurences a candidate needs to have for it to appear in the candidate set
+        """
         self.work_dir = "/projekte/semrel/WORK-AREA/Users/navid/SWOW-EN18"
         self.strength_file = strength_file
         self.response_file = "SWOW-EN.complete.20180827.csv"
@@ -26,14 +34,6 @@ class SWOWInterface:
             self.init_response_table()
         )
         self.most_frequent_pos = self.read_in_pos_freq()
-        """
-        Interface for the Small World of Words Word Association Data by Simon De Deyne that can give out candidate sets for words
-        the data consists of cues where people have given three responses they associate with the cue word
-        number_of_responses: the number of responses (max 3) to take into account
-        strength_file: if exists a tsv file with the columns cue, response, number of mentions, total number of responses to the cue, association strength, if None it will be generated
-        use_ppmi: whether to use pointwise mutual information as a measure for the association strength when there is no strength file
-        candidate_cap: number of occurences a candidate needs to have for it to appear in the candidate set
-        """
         (
             self.association_strength_matrix,
             self.cue_indices,
