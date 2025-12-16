@@ -376,3 +376,7 @@ class SWOWInterface:
 
         :param only_cues: Whether only cues or also responses should be given out
         """
+        if only_cues:
+            return [cue for cue in self.cue_indices]
+        else:
+            return [token for token in self.combined_cue_response_indices]
