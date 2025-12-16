@@ -287,30 +287,40 @@ class SWOWInterface:
             total += self.cue_response_count[word_2][word_1]
         return total
 
+    def get_neighbours(self, word, directional=False):
+        """
+        returns all the neighbours to the word in the word association graph
+        :param directional: whether the neighbours that are cues to the word should be given in addition to the responses
+        """
+        output = []
+        if word in self.cues_to_responses:
+            output += [
+                response
+                for response in self.cues_to_responses[word]
+                if self.get_num_occurrences(word, response) >= self.candidate_cap
+            ]
+
+        if word in self.responses_to_cues and directional:
+            output += [
+                cue
+                for cue in self.responses_to_cues[word]
+                if self.get_num_occurrences(cue, word) >= self.candidate_cap
+            ]
+
+        return output
+
     def get_candidate_set(self, word, pos=None):
         """
         returns all the responses given to the word and all the cues the word was given as a response to
         :param pos: list of parts of speech, restricts result to a certain part of speech if given(v:verb,n:noun,a:adjective)
         """
-        output = set()
-        if word in self.cues_to_responses:
-            output.update(
-                [
-                    response
-                    for response in self.cues_to_responses[word]
-                    if self.get_num_occurrences(word, response) >= self.candidate_cap
-                    if not pos or self.get_pos(response) in pos
-                ]
-            )
-        if word in self.responses_to_cues:
-            output.update(
-                [
-                    cue
-                    for cue in self.responses_to_cues[word]
-                    if self.get_num_occurrences(cue, word) >= self.candidate_cap
-                    if not pos or self.get_pos(cue) in pos
-                ]
-            )
+        output = set(
+            [
+                token
+                for token in self.get_neighbours(word, directional=True)
+                if not pos or self.get_pos(token) in pos
+            ]
+        )
         output.add(word)
         return output.difference(self.stops)
 
@@ -318,7 +328,7 @@ class SWOWInterface:
         """
         returns a dictionary that gives the association strength for all neighbours of the token in the word association graph
         """
-        neighbours = self.get_candidate_set(token)
+        neighbours = self.get_neighbours(token, directional=True)
         total_strength = np.array(
             [
                 self.get_association_strength(token, candidate)
