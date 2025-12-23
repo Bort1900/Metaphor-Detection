@@ -185,7 +185,7 @@ class NThresholdModel:
         :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
         """
         predicted_sense = self.best_fit(sentence, by_phrase=by_phrase)
-        if predicted_sense==sentence.target:
+        if predicted_sense == sentence.target:
             return 1
         try:
             target_vector = self.score_embeddings.get_input_vector(sentence.target)
@@ -267,7 +267,13 @@ class NThresholdModel:
         return best_candidate
 
     def train_thresholds(
-        self, increment, epochs, data=None, by_pos=None, by_phrase=False
+        self,
+        increment,
+        epochs,
+        data=None,
+        by_pos=None,
+        by_phrase=False,
+        exclude_extremes=None,
     ):
         """
         trains the model's threshold on the dev_data
@@ -277,6 +283,7 @@ class NThresholdModel:
         :param data: data to train on, defaults to dev data
         :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
         :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
+        :param exclude_extremes: if specified then false extremes will be ignored in training (e.g. class 0 should not have extreme value of class 1) list with value for each class
         """
         if not data:
             data = self.train_data
@@ -303,9 +310,22 @@ class NThresholdModel:
                     continue
                 if prediction != sentence.value:
                     for i, threshold in enumerate(self.decision_thresholds):
-                        if comp_value > threshold and sentence.value <= i:
+                        if (
+                            comp_value > threshold
+                            and sentence.value <= i
+                            and (
+                                not exclude_extremes
+                                or comp_value < exclude_extremes[i + 1]
+                            )
+                        ):
                             self.decision_thresholds[i] += increment
-                        if comp_value < threshold and sentence.value > i:
+                        if (
+                            comp_value < threshold
+                            and sentence.value > i
+                            and (
+                                not exclude_extremes or comp_value > exclude_extremes[i]
+                            )
+                        ):
                             self.decision_thresholds[i] -= increment
                 self.decision_thresholds.sort()
             print(f"Current Thresholds: {self.decision_thresholds}")
@@ -581,7 +601,6 @@ class ContextualMaoModel(NThresholdModel):
                 compare_vector = self.fit_embeddings.get_sentence_vector(sentence)
         return compare_vector
 
-    
     def best_fit(self, sentence, by_phrase=False):
         """
         returns the best candidate from the candidate set that fits into the sentence context
@@ -604,8 +623,8 @@ class ContextualMaoModel(NThresholdModel):
                 candidate_vector = self.fit_embeddings.get_input_vector(
                     candidate, pos=sentence.pos
                 )
-            if self.fit_embeddings.use_phrase_embedding=="concat":
-                candidate_vector=torch.concat((candidate_vector,candidate_vector))
+            if self.fit_embeddings.use_phrase_embedding == "concat":
+                candidate_vector = torch.concat((candidate_vector, candidate_vector))
             similarity = self.cos(candidate_vector, compare_vector)
             if self.apply_candidate_weight:
                 weight = self.candidate_source.get_association_strength(
