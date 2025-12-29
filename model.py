@@ -324,7 +324,7 @@ class NThresholdModel:
                             comp_value > threshold
                             and sentence.value <= i
                             and (
-                                not exclude_extremes or comp_value < exclude_extremes[0]
+                                not exclude_extremes or comp_value < exclude_extremes[1]
                             )
                         ):
                             self.decision_thresholds[i] += increment
@@ -332,7 +332,7 @@ class NThresholdModel:
                             comp_value < threshold
                             and sentence.value > i
                             and (
-                                not exclude_extremes or comp_value > exclude_extremes[1]
+                                not exclude_extremes or comp_value > exclude_extremes[0]
                             )
                         ):
                             self.decision_thresholds[i] -= increment
