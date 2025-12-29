@@ -145,6 +145,7 @@ class NThresholdModel:
         mean_thresholds = [0 for _ in range(len(self.decision_thresholds))]
         output = dict()
         for i in range(n):
+            print(f"Fold {i+1}:")
             test_split, train_split = self.data.get_ith_split(i, n)
             self.train_thresholds(
                 0.01,
@@ -323,8 +324,7 @@ class NThresholdModel:
                             comp_value > threshold
                             and sentence.value <= i
                             and (
-                                not exclude_extremes
-                                or comp_value < exclude_extremes[i + 1]
+                                not exclude_extremes or comp_value < exclude_extremes[0]
                             )
                         ):
                             self.decision_thresholds[i] += increment
@@ -332,7 +332,7 @@ class NThresholdModel:
                             comp_value < threshold
                             and sentence.value > i
                             and (
-                                not exclude_extremes or comp_value > exclude_extremes[i]
+                                not exclude_extremes or comp_value > exclude_extremes[1]
                             )
                         ):
                             self.decision_thresholds[i] -= increment
