@@ -131,7 +131,7 @@ class NThresholdModel:
         return scores
 
     def nfold_cross_validate(
-        self, n, save_file=None, by_pos=None, by_phrase=False, exclued_extremes=None
+        self, n, save_file=None, by_pos=None, by_phrase=False, exclude_extremes=None
     ):
         """
         performs nfold cross validation for the model and returns the mean evaluation measures
