@@ -130,7 +130,9 @@ class NThresholdModel:
                 output.write(str(scores))
         return scores
 
-    def nfold_cross_validate(self, n, save_file=None, by_pos=None, by_phrase=False):
+    def nfold_cross_validate(
+        self, n, save_file=None, by_pos=None, by_phrase=False, exclued_extremes=None
+    ):
         """
         performs nfold cross validation for the model and returns the mean evaluation measures
 
@@ -138,12 +140,19 @@ class NThresholdModel:
         :param save_file: filepath for possible storing
         :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
         :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
+        :param exclude_extremes: if the threshold training should exclude extremes
         """
         mean_thresholds = [0 for _ in range(len(self.decision_thresholds))]
         output = dict()
         for i in range(n):
             test_split, train_split = self.data.get_ith_split(i, n)
-            self.train_thresholds(0.01, 5, train_split, by_phrase=by_phrase)
+            self.train_thresholds(
+                0.01,
+                5,
+                train_split,
+                by_phrase=by_phrase,
+                exclude_extremes=exclude_extremes,
+            )
             scores = self.evaluate(test_split, by_pos=by_pos, by_phrase=by_phrase)
             for j in range(len(mean_thresholds)):
                 mean_thresholds[j] += self.decision_thresholds[j]
