@@ -358,7 +358,7 @@ class NThresholdModel:
                     self.test_data, by_pos=by_pos, by_phrase=by_phrase
                 )
                 output.write(
-                    f"{round(self.decision_thresholds[0],2)}\t{round(scores["precision_class_0"],2)}\t{round(scores["recall_class_0"],2)}\t{round(scores["f_1_class_0"],2)}\t{round(scores["f_1_class_1"],2)}\t{round(scores["macro_f_1"],2)}\n"
+                    f'{round(self.decision_thresholds[0],2)}\t{round(scores["precision_class_0"],2)}\t{round(scores["recall_class_0"],2)}\t{round(scores["f_1_class_0"],2)}\t{round(scores["f_1_class_1"],2)}\t{round(scores["macro_f_1"],2)}\n'
                 )
                 self.decision_thresholds[0] += increment
 
@@ -482,7 +482,7 @@ class MaoModel(NThresholdModel):
                     self.dev_data[batch_start : batch_start + batch_size]
                 )[0]
                 print(
-                    f"Current_threshold: {self.decision_threshold}\nBatch F-score: {scores["macro_f_1"]}"
+                    f'Current_threshold: {self.decision_threshold}\nBatch F-score: {scores["macro_f_1"]}'
                 )
                 batch_start += batch_size
                 if scores["recall"] < scores["precision"]:
