@@ -26,6 +26,7 @@ import torch
 def urban_extractor(filepath, use_unsure):
     sentences = []
     fail_counter = 0
+    not_agree_counter=0
     with open(filepath) as data:
         i=0
         for line in data:
@@ -61,9 +62,12 @@ def urban_extractor(filepath, use_unsure):
                         pos="n",
                     )
                     sentences += [verb_sentence, noun_sentence]
-                except ValueError:
+                except ValueError as e:
                     fail_counter += 1
-    print(f"Ignored {fail_counter} of {i}")
+            else:
+                not_agree_counter+=1
+    print(f"Ignored {fail_counter} bad sentences of {i} ")
+    print(f'Ignored {not_agree_counter} of {i} because of missing agreement to annotation')
     return sentences
 
 
