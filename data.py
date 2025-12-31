@@ -37,7 +37,7 @@ class Sentence:
                     self.target_token = token.lower()
                     break
         if self.target_index < 0:
-            raise ValueError("Target doesn't appear in sentence")
+            raise ValueError(f"Target {target} doesn't appear in sentence {sentence}")
         else:
             self.context = (
                 self.tokens[: self.target_index] + self.tokens[self.target_index + 1 :]
