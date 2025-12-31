@@ -112,13 +112,21 @@ class NThresholdModel:
         for sentence in tqdm(data):
             if by_pos and sentence.pos not in by_pos:
                 continue
+            print(sentence.sentence, sentence.phrase, sentence.value)
+            print(
+                self.candidate_source.get_candidate_set(
+                    sentence.target, pos=sentence.pos
+                )
+            )
             try:
                 prediction = int(self.predict(sentence, by_phrase=by_phrase))
+                print(prediction)
             except ValueError:
                 # print(f"{sentence.target} not in dictionary, ignoring sentence")
                 ignore_count += 1
                 continue
             confusion_matrix[prediction, sentence.value] += 1
+            breakpoint()
         print(confusion_matrix)
         print(f"ignored {ignore_count} sentences of {len(data)}")
         scores = NThresholdModel.calculate_scores(confusion_matrix=confusion_matrix)
@@ -182,6 +190,7 @@ class NThresholdModel:
         """
         try:
             similarity = self.get_compare_value(sentence, by_phrase=by_phrase)
+            print(similarity)
         except ValueError:
             raise ValueError(f"{sentence.target} not in dictionary")
         scale = self.decision_thresholds + [similarity]
@@ -195,6 +204,7 @@ class NThresholdModel:
         :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
         """
         predicted_sense = self.best_fit(sentence, by_phrase=by_phrase)
+        print(predicted_sense)
         if predicted_sense == sentence.target:
             return 1
         try:
@@ -710,24 +720,41 @@ class ComparingModel(NThresholdModel):
             )
         except KeyError:
             raise KeyError("Could not calculate the necessary embeddings")
-        return Vectors.cos_sim(literal_context_vec, literal_vec), Vectors.cos_sim(
-            associative_context_vec, associative_vec
-        )
+        if type(literal_vec) == np.ndarray:
+            literal_similarity = Vectors.cos_sim(literal_context_vec, literal_vec)
+        elif type(literal_vec) == torch.Tensor:
+            literal_similarity = self.cos(literal_context_vec, literal_vec)
+        if not literal_similarity > 0 and not literal_similarity < 0:
+            literal_similarity = 0
+        if type(associative_vec) == np.ndarray:
+            associative_similarity = Vectors.cos_sim(
+                associative_context_vec, associative_vec
+            )
+        elif type(associative_vec) == torch.Tensor:
+            associative_similarity = self.cos(associative_context_vec, associative_vec)
+        if not associative_similarity > 0 and not associative_similarity < 0:
+            associative_similarity = 0
+        return literal_similarity, associative_similarity
 
-    def evaluate_per_threshold(self, start, steps, increment, save_file):
+    def evaluate_per_threshold(self, start, steps, increment, save_file, by_pos=None):
         """
         writes some evaluation metrics into a file after evaluating the model with different thresholds
         :param start: the first threshold to test
         :param steps: the number of thresholds to test
         :param increment: the difference between two thresholds to test
         :param save_file: where to store the results
+        :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
         """
-        self.estimate_map_factor()
-        return super().evaluate_per_threshold(start, steps, increment, save_file)
+        self.estimate_map_factor(by_pos=by_pos)
+        return super().evaluate_per_threshold(
+            start, steps, increment, save_file, by_pos=by_pos
+        )
 
-    def estimate_map_factor(self):
+    def estimate_map_factor(self, by_pos=None):
         """
         estimates the factor for mapping from one embedding space to the other using dev data
+
+        :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
         """
         # finding the ranges of the two embeddings spaces
         print("estimating mapping factor")
@@ -737,6 +764,8 @@ class ComparingModel(NThresholdModel):
         largest_associative = -10
         ignore_count = 0
         for sentence in self.dev_data:
+            if by_pos and sentence.pos not in by_pos:
+                continue
             try:
                 literal_similarity, associative_similarity = self.get_similarities(
                     sentence
@@ -759,14 +788,15 @@ class ComparingModel(NThresholdModel):
         print(f"ignored {ignore_count} of {len(self.dev_data)} sentences")
         print(f"mapping factor: {self.map_factor}")
 
-    def train_thresholds(self, increment, epochs):
+    def train_thresholds(self, increment, epochs, by_pos=None):
         """
         :param trains the model's threshold on the dev_data
         :param increment: how much the threshold should be changed on a wrong prediction
         :param epochs: number of times the dev_data is run through the training process
+        :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
         """
         ignore_count = 0
-        self.estimate_map_factor()
+        self.estimate_map_factor(by_pos=by_pos)
         data_per_class = [
             [sentence for sentence in self.dev_data if sentence.value == i]
             for i in range(self.num_classes)
@@ -779,6 +809,8 @@ class ComparingModel(NThresholdModel):
                 data += random.choices(population=class_data, k=num_per_class)
             random.shuffle(data)
             for sentence in tqdm(data):
+                if by_pos and sentence.pos not in by_pos:
+                    continue
                 try:
                     comp_value = self.get_compare_value(sentence)
                     prediction = int(self.predict(sentence))
