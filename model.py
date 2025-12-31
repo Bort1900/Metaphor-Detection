@@ -51,6 +51,7 @@ class NThresholdModel:
         self.num_classes = num_classes
         self.apply_candidate_weight = apply_candidate_weight
         self.stops = stopwords.words("english")
+        self.cos = CosineSimilarity(dim=0, eps=1e-6)
 
     @staticmethod
     def calculate_scores(confusion_matrix):
@@ -598,7 +599,6 @@ class ContextualMaoModel(NThresholdModel):
             num_classes=num_classes,
         )
         self.use_context_vec = use_context_vec
-        self.cos = CosineSimilarity(dim=0, eps=1e-6)
 
     def get_compare_embedding(self, sentence, by_phrase=False):
         """
@@ -688,28 +688,38 @@ class ComparingModel(NThresholdModel):
         self.associative_embeddings = associative_embeddings
         self.map_factor = 1  # mapping the size of one embedding space to the other for linear transform
 
-    def get_compare_value(self, sentence):
+    def get_compare_value(self, sentence, by_phrase=False):
         """
         get a value by comparing literal and associative similarities to context
         :param sentence: the Sentence instance for the calculation
+        :param by_phrase: if evaluation should only use phrase
         """
         try:
-            literal_similarity, associative_similarity = self.get_similarities(sentence)
+            literal_similarity, associative_similarity = self.get_similarities(
+                sentence, by_phrase=by_phrase
+            )
         except KeyError:
             raise ValueError("could not calculate comparison value")
         return self.map_factor * literal_similarity - associative_similarity
 
-    def get_similarities(self, sentence):
+    def get_similarities(self, sentence, by_phrase=False):
         """
         returns the literal and associative similarity of the target to the context
         sentence: the Sentence instance for the calculation
+        :param by_phrase: if evaluation should only use phrase
         """
+        if by_phrase and sentence.phrase != "unknown":
+            context = [word for word in sentence.phrase if word != sentence.target]
+        else:
+            context = [
+                word for word in sentence.context if word.lower() not in self.stops
+            ]
         try:
             literal_context_vec = self.literal_embeddings.get_mean_vector(
-                sentence.context, self.use_output
+                context, self.use_output
             )
             associative_context_vec = self.associative_embeddings.get_mean_vector(
-                sentence.context
+                context, self.use_output
             )
             if self.use_output:
                 literal_vec = self.literal_embeddings.get_output_vector(sentence.target)
@@ -763,7 +773,7 @@ class ComparingModel(NThresholdModel):
         largest_literal = -10
         largest_associative = -10
         ignore_count = 0
-        for sentence in self.dev_data:
+        for sentence in self.train_data:
             if by_pos and sentence.pos not in by_pos:
                 continue
             try:
