@@ -292,7 +292,10 @@ class BertEmbeddings(Embeddings):
         """
         embeddings = []
         for token in tokens:
-            embeddings.append(self.get_input_vector(token))
+            try:
+                embeddings.append(self.get_input_vector(token))
+            except ValueError:
+                continue
         if None in embeddings:
             print(tokens)
         return torch.stack(embeddings).mean(dim=0)
