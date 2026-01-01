@@ -108,7 +108,6 @@ class DataSet:
         use_unsure,
         test_seed,
         test_split_size,
-        random_seed,
     ):
         """
         A set of sentences
