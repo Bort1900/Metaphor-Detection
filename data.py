@@ -101,59 +101,64 @@ class Sentence:
 
 
 class DataSet:
-    def __init__(self, filepath, extraction_function, use_unsure, seed=None):
+    def __init__(
+        self,
+        filepath,
+        extraction_function,
+        use_unsure,
+        test_seed,
+        test_split_size,
+        random_seed,
+    ):
         """
         A set of sentences
         :param filepath: where the data that will be converted to Sentences is stored
         :param extraction_function: function that specifically extracts Sentence instances from the provided datafile must have the use_unsure parameter
         :param use_unsure: parameter for the extraction_function that specifies wether the Sentence values are binary or have a third "unsure" bin
-        :param seed: if specified the seed for generating the random split
+        :param test_seed: random seed for extracting the test set
+        :param test_split_size: proportion of the extracted test split
         """
         self.sentences = extraction_function(filepath, use_unsure)
-        self.seed = seed
+        self.seed = test_seed
+        self.train_dev_split, self.test_split = self.get_splits(test_split_size)
 
-    def get_splits(self, splits):
+    def get_splits(self, test_split_size):
         """
         returns train, dev and test splits of the data as a list of three lists
-        :param splits: list of 3 values for train, dev and test split proportion in that order
+        :param test_split_size: proportion of test split of whole data
         """
-        if len(splits) != 3:
-            raise ValueError(
-                "Please give one value for train, development and test split each"
-            )
-        if sum(splits) > 1:
-            raise ValueError("Splits mustn't add to more than 100%")
-        num_train = math.floor(len(self.sentences) * splits[0])
-        num_dev = math.floor(len(self.sentences) * splits[1])
-        num_test = math.floor(len(self.sentences) * splits[2])
-        if self.seed:
-            random.seed(self.seed)
-        partitions = random.sample(self.sentences, k=num_train + num_dev + num_test)
+        if test_split_size > 1:
+            raise ValueError("split size can't be more than 100%")
+        num_train_dev = math.floor(len(self.sentences) * (1 - test_split_size))
+        num_test = math.floor(len(self.sentences) * test_split_size)
+        random.seed(self.seed)
+        partitions = random.sample(self.sentences, k=num_train_dev + num_test)
         return (
-            partitions[:num_train],
-            partitions[num_train : num_train + num_dev],
-            partitions[num_train + num_dev : num_train + num_dev + num_test],
+            partitions[:num_train_dev],
+            partitions[num_train_dev : num_train_dev + num_test],
         )
 
-    def get_ith_split(self, i, n):
+    @staticmethod
+    def get_ith_split(self, i, n, data):
         """
         returns the two splits(train,test) at position i for nfold cross validation
 
         :param i: which split of the data is extracted(starting with i=0, max n-1)
+        :param data: the data that will be split
         """
         if i > n - 1:
             raise ValueError("i can't be bigger than n-1")
-        num_sents = len(self.sentences)
+        num_sents = len(data)
         num_per_split = math.floor(num_sents / n)
         lower_index = i * num_per_split
         test_split = (
-            self.sentences[lower_index : lower_index + num_per_split]
+            data[lower_index : lower_index + num_per_split]
             if i < n - 1
-            else self.sentences[lower_index:]
+            else data[lower_index:]
         )
         train_split = (
-            self.sentences[:lower_index]
-            + self.sentences[lower_index + len(test_split) :]
+            data[:lower_index]
+            + data[lower_index + len(test_split) :]
         )
         return train_split, test_split
 
