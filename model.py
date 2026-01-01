@@ -6,7 +6,8 @@ import torch
 from nltk.corpus import stopwords
 from torch.nn import CosineSimilarity
 from tqdm import tqdm
-from data import Sentence
+from data import Sentence, DataSet
+from embeddings import Embeddings
 import math
 import matplotlib.pyplot as plt
 
@@ -14,19 +15,19 @@ import matplotlib.pyplot as plt
 class NThresholdModel:
     def __init__(
         self,
-        data,
+        data: DataSet,
         candidate_source,
-        mean_multi_word,
-        fit_embeddings,
-        score_embeddings,
-        use_output_vec,
-        apply_candidate_weight,
+        mean_multi_word: bool,
+        fit_embeddings: Embeddings,
+        score_embeddings: Embeddings,
+        use_output_vec: bool,
+        apply_candidate_weight: bool,
         restrict_pos=None,
         num_classes=2,
     ):
         """
         Model that categorizes Sentence data in n classes based on n-1 thresholds and uses a candidate set for getting the value
-        :param data: list of Sentence instances to train thresholds and evaluate model
+        :param data: Dataset used for training and evaluation
         :param candidate_source: an object with a get_candidate_set function
         :param mean_multi_word: whether embeddings for multi-word tokens should be mean pooled from the embeddings of the individual words
         :param fit_embeddings: source for embeddings for finding best fit candidate
@@ -37,10 +38,8 @@ class NThresholdModel:
         :param num_classes: number of classes to classify
         """
         self.data = data
-        split = self.data.get_splits(splits=[0.1, 0.1, 0.8])
-        self.train_data = split[0]
-        self.dev_data = split[1]
-        self.test_data = split[2]
+        self.train_dev_data = self.data.train_dev_split
+        self.test_data = self.data.test_split
         self.candidate_source = candidate_source
         self.mean_multi_word = mean_multi_word
         self.use_output = use_output_vec
@@ -98,10 +97,16 @@ class NThresholdModel:
         )
         return scores
 
-    def evaluate(self, data=None, save_file=None, by_pos=None, by_phrase=False):
+    def evaluate(
+        self,
+        data: list[Sentence] = None,
+        save_file: str = None,
+        by_pos: list[str] = None,
+        by_phrase: bool = False,
+    ) -> dict:
         """
         returns a dictionary of recall, precision and f-score metrics after evaluating the model on test data
-        :param data: test data for evaluation, defaults to test data
+        :param data: list of sentences for evaluation, defaults to test data
         :param save_file: filepath for possible storing
         :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
         :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
@@ -113,21 +118,21 @@ class NThresholdModel:
         for sentence in tqdm(data):
             if by_pos and sentence.pos not in by_pos:
                 continue
-            print(sentence.sentence, sentence.phrase, sentence.value)
-            print(
-                self.candidate_source.get_candidate_set(
-                    sentence.target, pos=sentence.pos
-                )
-            )
+            # print(sentence.sentence, sentence.phrase, sentence.value)
+            # print(
+            #     self.candidate_source.get_candidate_set(
+            #         sentence.target, pos=sentence.pos
+            #     )
+            # )
             try:
                 prediction = int(self.predict(sentence, by_phrase=by_phrase))
-                print(prediction)
+                # print(prediction)
             except ValueError:
                 # print(f"{sentence.target} not in dictionary, ignoring sentence")
                 ignore_count += 1
                 continue
             confusion_matrix[prediction, sentence.value] += 1
-            breakpoint()
+            # breakpoint()
         print(confusion_matrix)
         print(f"ignored {ignore_count} sentences of {len(data)}")
         scores = NThresholdModel.calculate_scores(confusion_matrix=confusion_matrix)
@@ -140,7 +145,13 @@ class NThresholdModel:
         return scores
 
     def nfold_cross_validate(
-        self, n, save_file=None, by_pos=None, by_phrase=False, exclude_extremes=None
+        self,
+        data: list[Sentence],
+        n: int,
+        save_file: str = None,
+        by_pos: list[str] = None,
+        by_phrase: bool = False,
+        exclude_extremes: tuple[float, float] = None,
     ):
         """
         performs nfold cross validation for the model and returns the mean evaluation measures
@@ -155,7 +166,7 @@ class NThresholdModel:
         output = dict()
         for i in range(n):
             print(f"Fold {i+1}:")
-            test_split, train_split = self.data.get_ith_split(i, n)
+            test_split, train_split = DataSet.get_ith_split(i, n, data)
             self.train_thresholds(
                 0.01,
                 5,
@@ -191,7 +202,7 @@ class NThresholdModel:
         """
         try:
             similarity = self.get_compare_value(sentence, by_phrase=by_phrase)
-            print(similarity)
+            # print(similarity)
         except ValueError:
             raise ValueError(f"{sentence.target} not in dictionary")
         scale = self.decision_thresholds + [similarity]
@@ -205,7 +216,7 @@ class NThresholdModel:
         :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
         """
         predicted_sense = self.best_fit(sentence, by_phrase=by_phrase)
-        print(predicted_sense)
+        # print(predicted_sense)
         if predicted_sense == sentence.target:
             return 1
         try:
@@ -289,38 +300,38 @@ class NThresholdModel:
 
     def train_thresholds(
         self,
-        increment,
-        epochs,
-        data=None,
-        by_pos=None,
-        by_phrase=False,
-        exclude_extremes=None,
+        increment: float,
+        epochs: int,
+        data: list[Sentence] = None,
+        by_pos: list[str] = None,
+        by_phrase: bool = False,
+        exclude_extremes: tuple[float] = None,
     ):
         """
         trains the model's threshold on the dev_data
 
         :param increment: how much the threshold should be changed on a wrong prediction
         :param epochs: number of times the dev_data is run through the training process
-        :param data: data to train on, defaults to dev data
+        :param data: list of sentences to train on, defaults to dev data
         :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
         :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
-        :param exclude_extremes: if specified then false extremes will be ignored in training (e.g. class 0 should not have extreme value of class 1) list with value for each class
+        :param exclude_extremes: if specified then false extremes will be ignored in training (e.g. class 0 should not have extreme value of class 1) tuple of two extremes
         """
         if not data:
-            data = self.train_data
+            data = self.train_dev_data
         data_per_class = [
-            [sentence for sentence in self.dev_data if sentence.value == i]
+            [sentence for sentence in data if sentence.value == i]
             for i in range(self.num_classes)
         ]
-        num_per_class = math.floor(len(self.dev_data) / self.num_classes)
+        num_per_class = math.floor(len(data) / self.num_classes)
         mean_thresholds = [0 for _ in range(len(self.decision_thresholds))]
         for epoch in range(epochs):
             print(f"Epoch {epoch+1}")
-            data = []
+            sentences = []
             for class_data in data_per_class:
-                data += random.choices(population=class_data, k=num_per_class)
-            random.shuffle(data)
-            for sentence in tqdm(data):
+                sentences += random.choices(population=class_data, k=num_per_class)
+            random.shuffle(sentences)
+            for sentence in tqdm(sentences):
                 if by_pos and sentence.pos not in by_pos:
                     continue
                 try:
@@ -355,17 +366,28 @@ class NThresholdModel:
         print(f"Mean Thresholds: {self.decision_thresholds}")
 
     def evaluate_per_threshold(
-        self, start, steps, increment, save_file, by_pos=None, by_phrase=False
+        self,
+        start: float,
+        steps: int,
+        increment: float,
+        save_file: str,
+        data: list[Sentence] = None,
+        by_pos: list[str] = None,
+        by_phrase: bool = False,
     ):
         """
         writes some evaluation metrics into a file after evaluating the model with different thresholds
+
         :param start: the first threshold to test
         :param steps: the number of thresholds to test
         :param increment: the difference between two thresholds to test
         :param save_file: where to store the results
+        :param data: list of sentences to evaluate if specified, else test data of model
         :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
         :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
         """
+        if not data:
+            data = self.test_data
         if self.num_classes > 2:
             raise ValueError("only works for 2 classes")
         self.decision_thresholds = [start]
@@ -374,9 +396,7 @@ class NThresholdModel:
                 "Threshold\tPrecision\tRecall\tF1(Class 1)\tF1(Class 2)\tF1(Macro-Average)\n"
             )
             for i in range(steps):
-                scores = self.evaluate(
-                    self.test_data, by_pos=by_pos, by_phrase=by_phrase
-                )
+                scores = self.evaluate(data, by_pos=by_pos, by_phrase=by_phrase)
                 output.write(
                     f'{round(self.decision_thresholds[0],2)}\t{round(scores["precision_class_0"],2)}\t{round(scores["recall_class_0"],2)}\t{round(scores["f_1_class_0"],2)}\t{round(scores["f_1_class_1"],2)}\t{round(scores["macro_f_1"],2)}\n'
                 )
@@ -384,15 +404,19 @@ class NThresholdModel:
 
     def draw_distribution_per_class(
         self,
-        save_file,
-        labels,
-        title,
-        by_pos=None,
-        by_phrase=False,
-        graph_type="boxplot",
+        save_file: str,
+        labels: list[str],
+        title: str,
+        data: list[Sentence] = None,
+        by_pos: list[str] = None,
+        by_phrase: bool = False,
+        graph_type: str = "boxplot",
     ):
         """
         draws box plots of the distributions of the prediction scores for each of the classes
+        :param labels: labels for each class
+        :param title: title of the graph
+        :param data: list of sentences to evaluate if specified, else model test set
         :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
         :param save_file: where the plots are stored
         :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
@@ -407,8 +431,10 @@ class NThresholdModel:
             "#D55E00",
             "#CC79A7",
         ]
+        if not data:
+            data = self.test_data
         datapoints = [[] for _ in range(self.num_classes)]
-        for sent in self.test_data:
+        for sent in data:
             if by_pos and sent.pos not in by_pos:
                 continue
             try:
@@ -449,18 +475,18 @@ class NThresholdModel:
 class MaoModel(NThresholdModel):
     def __init__(
         self,
-        data,
+        data: DataSet,
         candidate_source,
-        mean_multi_word,
-        fit_embeddings,
-        score_embeddings,
-        use_output_vec,
-        apply_candidate_weight,
-        restrict_pos=None,
+        mean_multi_word: bool,
+        fit_embeddings: Embeddings,
+        score_embeddings: Embeddings,
+        use_output_vec: bool,
+        apply_candidate_weight: bool,
+        restrict_pos: list[str] = None,
     ):
         """
         Model that works like the model from the Mao(2018) paper, see NThresholdModel
-        :param data: list of Sentence instances to train thresholds and evaluate model
+        :param data: DataSet instance to train thresholds and evaluate model
         :param candidate_source: an object with a get_candidate_set function
         :param mean_multi_word: whether embeddings for multi-word tokens should be mean pooled from the embeddings of the individual words
         :param fit_embeddings: source for embeddings for finding best fit candidate
@@ -482,6 +508,7 @@ class MaoModel(NThresholdModel):
 
     def train_threshold(self, increment, epochs, batch_size=-1):
         """
+        deprecated
         looks for optimal threshold by approximating recall to precision
         :param increment: initial threshold change when approximating
         :param epochs: number of times to go over development data
@@ -566,19 +593,19 @@ class MaoModel(NThresholdModel):
 class ContextualMaoModel(NThresholdModel):
     def __init__(
         self,
-        data,
+        data: DataSet,
         candidate_source,
-        mean_multi_word,
-        fit_embeddings,
-        score_embeddings,
-        use_context_vec,
-        apply_candidate_weight,
-        restrict_pos=None,
-        num_classes=2,
+        mean_multi_word: bool,
+        fit_embeddings: Embeddings,
+        score_embeddings: Embeddings,
+        use_context_vec: bool,
+        apply_candidate_weight: bool,
+        restrict_pos: list[str] = None,
+        num_classes: int = 2,
     ):
         """
         like Mao Model but uses contextual embeddings
-        :param data: list of Sentence instances to train thresholds and evaluate model
+        :param data: DataSet instance to train thresholds and evaluate model
         :param candidate_source: an object with a get_candidate_set function
         :param mean_multi_word: whether embeddings for multi-word tokens should be mean pooled from the embeddings of the individual words
         :param embeddings: source for embeddings for comparing
@@ -660,15 +687,15 @@ class ContextualMaoModel(NThresholdModel):
 class ComparingModel(NThresholdModel):
     def __init__(
         self,
-        data,
-        literal_embeddings,
-        associative_embeddings,
-        use_output_vec,
-        num_classes=2,
+        data: DataSet,
+        literal_embeddings: Embeddings,
+        associative_embeddings: Embeddings,
+        use_output_vec: bool,
+        num_classes: int = 2,
     ):
         """
         model that compares literal and associative similarity and predicts metaphoricity with a threshold
-        :param data: list of Sentence instances to train thresholds and evaluate model
+        :param data: DataSet instance to train thresholds and evaluate model
         :param literal_embeddings: Semantic Embeddings for comparing
         :param use_output_vec: whether ouput vectors(word2vec) should be used for comparing context to candidates
         :param num_classes: number of classes to classify
@@ -746,34 +773,50 @@ class ComparingModel(NThresholdModel):
             associative_similarity = 0
         return literal_similarity, associative_similarity
 
-    def evaluate_per_threshold(self, start, steps, increment, save_file, by_pos=None):
+    def evaluate_per_threshold(
+        self,
+        start: float,
+        steps: int,
+        increment: float,
+        save_file: str,
+        data: list[Sentence] = None,
+        by_pos: list[str] = None,
+    ):
         """
         writes some evaluation metrics into a file after evaluating the model with different thresholds
         :param start: the first threshold to test
         :param steps: the number of thresholds to test
         :param increment: the difference between two thresholds to test
         :param save_file: where to store the results
+        :param data: list of sentences to evaluate if specified else model test set
         :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
         """
-        self.estimate_map_factor(by_pos=by_pos)
+        if not data:
+            data = self.test_data
+        self.estimate_map_factor(
+            by_pos=by_pos,
+        )
         return super().evaluate_per_threshold(
-            start, steps, increment, save_file, by_pos=by_pos
+            start, steps, increment, save_file, by_pos=by_pos, data=data
         )
 
-    def estimate_map_factor(self, by_pos=None):
+    def estimate_map_factor(self, data: list[Sentence] = None, by_pos=None):
         """
         estimates the factor for mapping from one embedding space to the other using dev data
 
+        :param data: list of sentences to evaluate if specified else model train set
         :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
         """
         # finding the ranges of the two embeddings spaces
+        if not data:
+            data = self.train_dev_data
         print("estimating mapping factor")
         smallest_literal = 10
         smallest_associative = 10
         largest_literal = -10
         largest_associative = -10
         ignore_count = 0
-        for sentence in self.train_data:
+        for sentence in data:
             if by_pos and sentence.pos not in by_pos:
                 continue
             try:
@@ -795,30 +838,39 @@ class ComparingModel(NThresholdModel):
         self.map_factor = (largest_associative - smallest_associative) / (
             largest_literal - smallest_literal
         )
-        print(f"ignored {ignore_count} of {len(self.dev_data)} sentences")
+        print(f"ignored {ignore_count} of {len(data)} sentences")
         print(f"mapping factor: {self.map_factor}")
 
-    def train_thresholds(self, increment, epochs, by_pos=None):
+    def train_thresholds(
+        self,
+        increment: float,
+        epochs: int,
+        data: list[Sentence] = None,
+        by_pos: list[str] = None,
+    ):
         """
         :param trains the model's threshold on the dev_data
         :param increment: how much the threshold should be changed on a wrong prediction
         :param epochs: number of times the dev_data is run through the training process
+        :param data: list of sentences to evaluate if specified else model train set
         :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
         """
+        if not data:
+            data = self.train_dev_data
         ignore_count = 0
         self.estimate_map_factor(by_pos=by_pos)
         data_per_class = [
-            [sentence for sentence in self.dev_data if sentence.value == i]
+            [sentence for sentence in data if sentence.value == i]
             for i in range(self.num_classes)
         ]
-        num_per_class = math.floor(len(self.dev_data) / self.num_classes)
+        num_per_class = math.floor(len(data) / self.num_classes)
         for epoch in range(epochs):
             print(f"Epoch {epoch+1}")
-            data = []
+            sentences = []
             for class_data in data_per_class:
-                data += random.choices(population=class_data, k=num_per_class)
-            random.shuffle(data)
-            for sentence in tqdm(data):
+                sentences += random.choices(population=class_data, k=num_per_class)
+            random.shuffle(sentences)
+            for sentence in tqdm(sentences):
                 if by_pos and sentence.pos not in by_pos:
                     continue
                 try:
@@ -834,22 +886,22 @@ class ComparingModel(NThresholdModel):
                         if comp_value < threshold and sentence.value > i:
                             self.decision_thresholds[i] -= increment
                 self.decision_thresholds.sort()
-            print(f"ignored {ignore_count} of {len(data)}")
+            print(f"ignored {ignore_count} of {len(sentences)}")
             print(f"Current Thresholds: {self.decision_thresholds}")
 
 
 class RandomBaseline(NThresholdModel):
     def __init__(
         self,
-        data,
+        data: DataSet,
         candidate_source,
-        score_embeddings,
-        restrict_pos=None,
-        num_classes=2,
+        score_embeddings: Embeddings,
+        restrict_pos: list[str] = None,
+        num_classes: int = 2,
     ):
         """
         Model that randomly choses a word from the candidate set to predict the class with a threshold
-        :param data: list of Sentence instances to train thresholds and evaluate model
+        :param data: DataSet instance to train thresholds and evaluate model
         :param candidate_source: an object with a get_candidate_set function
         :param embeddings: source for embeddings for comparing
         :param restrict_pos: list of parts of speech to which candidate sets should be restricted

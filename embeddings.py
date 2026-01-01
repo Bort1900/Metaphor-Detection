@@ -211,7 +211,7 @@ class BertEmbeddings(Embeddings):
             cache_dir=os.path.join("/projekte/semrel/WORK-AREA/Users/navid", "bert"),
         )
         if torch.cuda.is_available():
-            self.model.to("cuda")
+            self.model.to(torch.device("cuda"))
         self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
         self.lookup_table = dict()
         self.use_phrase_embedding = use_phrase_embedding

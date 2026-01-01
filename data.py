@@ -139,7 +139,7 @@ class DataSet:
         )
 
     @staticmethod
-    def get_ith_split(self, i, n, data):
+    def get_ith_split(i: int, n: int, data: list[Sentence]):
         """
         returns the two splits(train,test) at position i for nfold cross validation
 
@@ -156,10 +156,7 @@ class DataSet:
             if i < n - 1
             else data[lower_index:]
         )
-        train_split = (
-            data[:lower_index]
-            + data[lower_index + len(test_split) :]
-        )
+        train_split = data[:lower_index] + data[lower_index + len(test_split) :]
         return train_split, test_split
 
 
