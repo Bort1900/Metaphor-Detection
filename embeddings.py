@@ -210,7 +210,6 @@ class BertEmbeddings(Embeddings):
             output_hidden_states=True,
             cache_dir=os.path.join("/projekte/semrel/WORK-AREA/Users/navid", "bert"),
         )
-        self.stops = stopwords.words("english")
         if torch.cuda.is_available():
             self.model.to("cuda")
         self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
@@ -347,7 +346,7 @@ class BertEmbeddings(Embeddings):
         """
         embeddings = []
         for i, token in enumerate(sentence.tokens):
-            if i != sentence.target_index and token.lower() not in self.stops:
+            if i != sentence.target_index:
                 token_sent = sentence.change_target(
                     new_target=token, new_target_index=i
                 )
