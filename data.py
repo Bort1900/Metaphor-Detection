@@ -119,23 +119,32 @@ class DataSet:
         """
         self.sentences = extraction_function(filepath, use_unsure)
         self.seed = test_seed
-        self.train_dev_split, self.test_split = self.get_splits(test_split_size)
+        self.train_dev_split, self.test_split = self.get_splits(
+            proportions=[1 - test_split_size, test_split_size],
+            data=self.sentences,
+            seed=self.seed,
+        )
 
-    def get_splits(self, test_split_size):
+    @staticmethod
+    def get_splits(proportions: list[float], data: list[Sentence], seed: int = 0):
         """
         returns train, dev and test splits of the data as a list of three lists
-        :param test_split_size: proportion of test split of whole data
+        :param proportions: proportions of splits of whole data should add to 1
+        :param data: list of sentences to split
+        :param seed: random seed for sampling splits
         """
-        if test_split_size > 1:
-            raise ValueError("split size can't be more than 100%")
-        num_train_dev = math.floor(len(self.sentences) * (1 - test_split_size))
-        num_test = math.floor(len(self.sentences) * test_split_size)
-        random.seed(self.seed)
-        partitions = random.sample(self.sentences, k=num_train_dev + num_test)
-        return (
-            partitions[:num_train_dev],
-            partitions[num_train_dev : num_train_dev + num_test],
-        )
+        if sum(proportions) > 1:
+            raise ValueError("splits added together can't be more than 100%")
+        start = 0
+        end = 0
+        random.seed(seed)
+        random_order = random.sample(data, k=len(data))
+        partitions = []
+        for i in range(len(proportions)):
+            end = math.floor(len(data) * proportions[i]) + start
+            partitions.append(random_order[start:end])
+            start = end
+        return partitions
 
     @staticmethod
     def get_ith_split(i: int, n: int, data: list[Sentence]):
