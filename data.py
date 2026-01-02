@@ -126,7 +126,7 @@ class DataSet:
         )
 
     @staticmethod
-    def get_splits(proportions: list[float], data: list[Sentence], seed: int = 0):
+    def get_splits(proportions: list[float], data: list[Sentence], seed: int = 0)->list[list[Sentence]]:
         """
         returns train, dev and test splits of the data as a list of three lists
         :param proportions: proportions of splits of whole data should add to 1

@@ -7,7 +7,7 @@ from nltk.corpus import stopwords
 from torch.nn import CosineSimilarity
 from tqdm import tqdm
 from data import Sentence, DataSet
-from embeddings import Embeddings
+from embeddings import Embeddings, BertEmbeddings
 import math
 import matplotlib.pyplot as plt
 
@@ -99,9 +99,9 @@ class NThresholdModel:
 
     def evaluate(
         self,
-        data: list[Sentence] = None,
-        save_file: str = None,
-        by_pos: list[str] = None,
+        data: list[Sentence] | None = None,
+        save_file: str | None = None,
+        by_pos: list[str] | None = None,
         by_phrase: bool = False,
     ) -> dict:
         """
@@ -147,11 +147,11 @@ class NThresholdModel:
     def nfold_cross_validate(
         self,
         n: int,
-        data: list[Sentence] = None,
-        save_file: str = None,
-        by_pos: list[str] = None,
+        data: list[Sentence] | None = None,
+        save_file: str | None = None,
+        by_pos: list[str] | None = None,
         by_phrase: bool = False,
-        exclude_extremes: tuple[float, float] = None,
+        exclude_extremes: tuple[float, float] | None = None,
         training_increment: float = 0.01,
         training_epochs: int = 10,
     ):
@@ -235,7 +235,7 @@ class NThresholdModel:
         if predicted_sense == sentence.target:
             return 1
         try:
-            target_vector = self.score_embeddings.get_input_vector(sentence.target)
+            target_vector = self.score_embeddings.get_input_vector(sentence.target,pos=sentence.pos,exclude_sent=sentence)
             if len(predicted_sense.split("_")) > 1 and self.mean_multi_word:
                 predicted_vector = self.score_embeddings.get_mean_vector(
                     tokens=predicted_sense.split("_")
@@ -250,6 +250,10 @@ class NThresholdModel:
             similarity = Vectors.cos_sim(target_vector, predicted_vector)
         elif type(target_vector) == torch.Tensor:
             similarity = self.cos(target_vector, predicted_vector)
+        else:
+            raise TypeError(
+                f"target vector of type {type(target_vector)} not supported"
+            )
         if not similarity > 0 and not similarity < 0:
             return 0
         else:
@@ -317,10 +321,10 @@ class NThresholdModel:
         self,
         increment: float,
         epochs: int,
-        data: list[Sentence] = None,
-        by_pos: list[str] = None,
+        data: list[Sentence] | None = None,
+        by_pos: list[str] | None = None,
         by_phrase: bool = False,
-        exclude_extremes: tuple[float] = None,
+        exclude_extremes: tuple[float, float] | None = None,
     ):
         """
         trains the model's threshold on the dev_data
@@ -339,7 +343,7 @@ class NThresholdModel:
             for i in range(self.num_classes)
         ]
         num_per_class = math.floor(len(data) / self.num_classes)
-        mean_thresholds = [0 for _ in range(len(self.decision_thresholds))]
+        mean_thresholds = [0.0 for _ in range(len(self.decision_thresholds))]
         for epoch in range(epochs):
             print(f"Epoch {epoch+1}")
             sentences = []
@@ -386,8 +390,8 @@ class NThresholdModel:
         steps: int,
         increment: float,
         save_file: str,
-        data: list[Sentence] = None,
-        by_pos: list[str] = None,
+        data: list[Sentence] | None = None,
+        by_pos: list[str] | None = None,
         by_phrase: bool = False,
     ):
         """
@@ -422,8 +426,8 @@ class NThresholdModel:
         save_file: str,
         labels: list[str],
         title: str,
-        data: list[Sentence] = None,
-        by_pos: list[str] = None,
+        data: list[Sentence] | None = None,
+        by_pos: list[str] | None = None,
         by_phrase: bool = False,
         graph_type: str = "boxplot",
     ):
@@ -462,7 +466,7 @@ class NThresholdModel:
                 datapoints[sent.value].append(similarity)
         fig, ax = plt.subplots()
         if graph_type == "boxplot":
-            ax.boxplot(datapoints, labels=labels, orientation="horizontal")
+            ax.boxplot(datapoints, tick_labels=labels, orientation="horizontal")
         elif graph_type == "scatter":
             for i in range(self.num_classes):
                 ax.scatter(
@@ -497,7 +501,7 @@ class MaoModel(NThresholdModel):
         score_embeddings: Embeddings,
         use_output_vec: bool,
         apply_candidate_weight: bool,
-        restrict_pos: list[str] = None,
+        restrict_pos: list[str] | None = None,
     ):
         """
         Model that works like the model from the Mao(2018) paper, see NThresholdModel
@@ -521,88 +525,88 @@ class MaoModel(NThresholdModel):
             apply_candidate_weight=apply_candidate_weight,
         )
 
-    def train_threshold(self, increment, epochs, batch_size=-1):
-        """
-        deprecated
-        looks for optimal threshold by approximating recall to precision
-        :param increment: initial threshold change when approximating
-        :param epochs: number of times to go over development data
-        :param batch_size: number of datapoints after which threshold is aligned, if -1 the dataset will not be separated into batches
-        """
+    # def train_threshold(self, increment, epochs, batch_size=-1):
+    #     """
+    #     deprecated
+    #     looks for optimal threshold by approximating recall to precision
+    #     :param increment: initial threshold change when approximating
+    #     :param epochs: number of times to go over development data
+    #     :param batch_size: number of datapoints after which threshold is aligned, if -1 the dataset will not be separated into batches
+    #     """
 
-        if batch_size < 0:
-            batch_number = len(self.dev_data)
-        else:
-            batch_number = math.floor(len(self.dev_data) / batch_size)
-        alternating_counter = 0  # checks for jumping over optimum
-        for i in range(epochs):
-            random.shuffle(self.dev_data)
-            print(f"epoch {i+1}:")
-            batch_start = 0
-            for _ in range(batch_number):
-                scores = self.evaluate(
-                    self.dev_data[batch_start : batch_start + batch_size]
-                )[0]
-                print(
-                    f'Current_threshold: {self.decision_threshold}\nBatch F-score: {scores["macro_f_1"]}'
-                )
-                batch_start += batch_size
-                if scores["recall"] < scores["precision"]:
-                    self.decision_threshold += increment
-                    alternating_counter = max(0, alternating_counter * (-1) + 1)
-                elif scores["precision"] < scores["recall"]:
-                    self.decision_threshold -= increment
-                    alternating_counter = min(0, alternating_counter * (-1) - 1)
-                # 4 alternations between raising and lowering threshold
-                if abs(alternating_counter) >= 4:
-                    increment /= 2
-                    alternating_counter = 0
-                print(alternating_counter)
+    #     if batch_size < 0:
+    #         batch_number = len(self.dev_data)
+    #     else:
+    #         batch_number = math.floor(len(self.dev_data) / batch_size)
+    #     alternating_counter = 0  # checks for jumping over optimum
+    #     for i in range(epochs):
+    #         random.shuffle(self.dev_data)
+    #         print(f"epoch {i+1}:")
+    #         batch_start = 0
+    #         for _ in range(batch_number):
+    #             scores = self.evaluate(
+    #                 self.dev_data[batch_start : batch_start + batch_size]
+    #             )[0]
+    #             print(
+    #                 f'Current_threshold: {self.decision_threshold}\nBatch F-score: {scores["macro_f_1"]}'
+    #             )
+    #             batch_start += batch_size
+    #             if scores["recall"] < scores["precision"]:
+    #                 self.decision_threshold += increment
+    #                 alternating_counter = max(0, alternating_counter * (-1) + 1)
+    #             elif scores["precision"] < scores["recall"]:
+    #                 self.decision_threshold -= increment
+    #                 alternating_counter = min(0, alternating_counter * (-1) - 1)
+    #             # 4 alternations between raising and lowering threshold
+    #             if abs(alternating_counter) >= 4:
+    #                 increment /= 2
+    #                 alternating_counter = 0
+    #             print(alternating_counter)
 
-    def optimize_threshold(self, max_epochs=100):
-        """
-        deprecated
-        """
-        increment = 0.1
-        self.decision_threshold = 0
-        direction = 1  # 1:upwards, -1 downwards
-        lower_bound = 0
-        i = 0
-        upper_bound = 1
-        last_f_score = self.evaluate(self.dev_data)[0]["macro_f_1"]
-        while (
-            self.decision_threshold <= upper_bound
-            and self.decision_threshold >= lower_bound
-            and i < max_epochs
-        ):
-            self.decision_threshold += direction * increment
-            current_f_score = self.evaluate(self.dev_data)[0]["macro_f_1"]
-            if current_f_score < last_f_score:
-                if direction == 1:
-                    upper_bound = self.decision_threshold
-                else:
-                    lower_bound = self.decision_threshold
-                increment /= 2
-                direction *= -1
-            last_f_score = current_f_score
-            print(self.decision_threshold, last_f_score, lower_bound, upper_bound)
-            i += 1
+    # def optimize_threshold(self, max_epochs=100):
+    #     """
+    #     deprecated
+    #     """
+    #     increment = 0.1
+    #     self.decision_threshold = 0
+    #     direction = 1  # 1:upwards, -1 downwards
+    #     lower_bound = 0
+    #     i = 0
+    #     upper_bound = 1
+    #     last_f_score = self.evaluate(self.dev_data)[0]["macro_f_1"]
+    #     while (
+    #         self.decision_threshold <= upper_bound
+    #         and self.decision_threshold >= lower_bound
+    #         and i < max_epochs
+    #     ):
+    #         self.decision_threshold += direction * increment
+    #         current_f_score = self.evaluate(self.dev_data)[0]["macro_f_1"]
+    #         if current_f_score < last_f_score:
+    #             if direction == 1:
+    #                 upper_bound = self.decision_threshold
+    #             else:
+    #                 lower_bound = self.decision_threshold
+    #             increment /= 2
+    #             direction *= -1
+    #         last_f_score = current_f_score
+    #         print(self.decision_threshold, last_f_score, lower_bound, upper_bound)
+    #         i += 1
 
-    def find_best_threshold(self, steps):
-        """
-        deprecated
-        """
-        self.decision_threshold = 0
-        best_threshold = 0
-        best_f_score = 0
-        while self.decision_threshold < 1:
-            f_score = self.evaluate(self.dev_data)[0]["macro_f_1"]
-            if f_score > best_f_score:
-                best_f_score = f_score
-                best_threshold = self.decision_threshold
-            self.decision_threshold += steps
-        self.decision_threshold = best_threshold
-        print(f"Best Threshold: {self.decision_threshold}, F-Score: {best_f_score}")
+    # def find_best_threshold(self, steps):
+    #     """
+    #     deprecated
+    #     """
+    #     self.decision_threshold = 0
+    #     best_threshold = 0
+    #     best_f_score = 0
+    #     while self.decision_threshold < 1:
+    #         f_score = self.evaluate(self.dev_data)[0]["macro_f_1"]
+    #         if f_score > best_f_score:
+    #             best_f_score = f_score
+    #             best_threshold = self.decision_threshold
+    #         self.decision_threshold += steps
+    #     self.decision_threshold = best_threshold
+    #     print(f"Best Threshold: {self.decision_threshold}, F-Score: {best_f_score}")
 
 
 class ContextualMaoModel(NThresholdModel):
@@ -611,11 +615,11 @@ class ContextualMaoModel(NThresholdModel):
         data: DataSet,
         candidate_source,
         mean_multi_word: bool,
-        fit_embeddings: Embeddings,
+        fit_embeddings: BertEmbeddings,
         score_embeddings: Embeddings,
         use_context_vec: bool,
         apply_candidate_weight: bool,
-        restrict_pos: list[str] = None,
+        restrict_pos: list[str] | None = None,
         num_classes: int = 2,
     ):
         """
@@ -640,9 +644,10 @@ class ContextualMaoModel(NThresholdModel):
             apply_candidate_weight=apply_candidate_weight,
             num_classes=num_classes,
         )
+        self.fit_embeddings=fit_embeddings
         self.use_context_vec = use_context_vec
 
-    def get_compare_embedding(self, sentence, by_phrase=False):
+    def get_compare_embedding(self, sentence: Sentence, by_phrase=False):
         """
         returns the vector to which the candidates will be compared
 
@@ -662,7 +667,7 @@ class ContextualMaoModel(NThresholdModel):
                 compare_vector = self.fit_embeddings.get_sentence_vector(sentence)
         return compare_vector
 
-    def best_fit(self, sentence, by_phrase=False):
+    def best_fit(self, sentence:Sentence, by_phrase:bool=False):
         """
         returns the best candidate from the candidate set that fits into the sentence context
         :param sentence: sentence that will be predicted
@@ -719,7 +724,7 @@ class ComparingModel(NThresholdModel):
         super().__init__(
             data=data,
             candidate_source=None,
-            mean_multi_word=None,
+            mean_multi_word=False,
             fit_embeddings=literal_embeddings,
             score_embeddings=associative_embeddings,
             use_output_vec=use_output_vec,
@@ -776,6 +781,8 @@ class ComparingModel(NThresholdModel):
             literal_similarity = Vectors.cos_sim(literal_context_vec, literal_vec)
         elif type(literal_vec) == torch.Tensor:
             literal_similarity = self.cos(literal_context_vec, literal_vec)
+        else:
+            raise TypeError(f"target vector of type {type(literal_vec)} not supported")
         if not literal_similarity > 0 and not literal_similarity < 0:
             literal_similarity = 0
         if type(associative_vec) == np.ndarray:
@@ -784,6 +791,10 @@ class ComparingModel(NThresholdModel):
             )
         elif type(associative_vec) == torch.Tensor:
             associative_similarity = self.cos(associative_context_vec, associative_vec)
+        else:
+            raise TypeError(
+                f"target vector of type {type(associative_vec)} not supported"
+            )
         if not associative_similarity > 0 and not associative_similarity < 0:
             associative_similarity = 0
         return literal_similarity, associative_similarity
@@ -794,8 +805,9 @@ class ComparingModel(NThresholdModel):
         steps: int,
         increment: float,
         save_file: str,
-        data: list[Sentence] = None,
-        by_pos: list[str] = None,
+        data: list[Sentence] | None = None,
+        by_pos: list[str] | None = None,
+        by_phrase: bool = False,
     ):
         """
         writes some evaluation metrics into a file after evaluating the model with different thresholds
@@ -805,6 +817,7 @@ class ComparingModel(NThresholdModel):
         :param save_file: where to store the results
         :param data: list of sentences to evaluate if specified else model test set
         :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
+        :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
         """
         if not data:
             data = self.test_data
@@ -812,10 +825,16 @@ class ComparingModel(NThresholdModel):
             by_pos=by_pos,
         )
         return super().evaluate_per_threshold(
-            start, steps, increment, save_file, by_pos=by_pos, data=data
+            start,
+            steps,
+            increment,
+            save_file,
+            by_pos=by_pos,
+            data=data,
+            by_phrase=by_phrase,
         )
 
-    def estimate_map_factor(self, data: list[Sentence] = None, by_pos=None):
+    def estimate_map_factor(self, data: list[Sentence] | None = None, by_pos=None):
         """
         estimates the factor for mapping from one embedding space to the other using dev data
 
@@ -860,8 +879,10 @@ class ComparingModel(NThresholdModel):
         self,
         increment: float,
         epochs: int,
-        data: list[Sentence] = None,
-        by_pos: list[str] = None,
+        data: list[Sentence] | None = None,
+        by_pos: list[str] | None = None,
+        by_phrase: bool = False,
+        exclude_extremes: tuple[float, float] | None = None,
     ):
         """
         :param trains the model's threshold on the dev_data
@@ -869,6 +890,8 @@ class ComparingModel(NThresholdModel):
         :param epochs: number of times the dev_data is run through the training process
         :param data: list of sentences to evaluate if specified else model train set
         :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
+        :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
+        :param exclude_extremes: irrelevant
         """
         if not data:
             data = self.train_dev_data
@@ -889,8 +912,8 @@ class ComparingModel(NThresholdModel):
                 if by_pos and sentence.pos not in by_pos:
                     continue
                 try:
-                    comp_value = self.get_compare_value(sentence)
-                    prediction = int(self.predict(sentence))
+                    comp_value = self.get_compare_value(sentence, by_phrase=by_phrase)
+                    prediction = int(self.predict(sentence, by_phrase=by_phrase))
                 except ValueError:
                     ignore_count += 1
                     continue
@@ -911,7 +934,7 @@ class RandomBaseline(NThresholdModel):
         data: DataSet,
         candidate_source,
         score_embeddings: Embeddings,
-        restrict_pos: list[str] = None,
+        restrict_pos: list[str] | None = None,
         num_classes: int = 2,
     ):
         """
@@ -934,10 +957,11 @@ class RandomBaseline(NThresholdModel):
             num_classes=num_classes,
         )
 
-    def best_fit(self, sentence):
+    def best_fit(self, sentence, by_phrase: bool = False):
         """
         returns random element from the candidate set
         sentence: Sentence instance the model will predict
+        :param by_phrase: irrelevant
         """
         candidate_set = self.candidate_source.get_candidate_set(
             sentence.target, pos=self.restrict_pos

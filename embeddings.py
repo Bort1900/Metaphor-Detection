@@ -52,7 +52,15 @@ class Embeddings:
         :param token: token for which embeddings are returned
         :param pos: part of speech of the token if known
         """
-        return token
+        return [0]
+
+    def get_output_vector(self, token: str) -> Iterable:
+        """
+        returns the output embedding for the token(word2vec)
+
+        :param token: token for which embedding is returned
+        """
+        return [0]
 
 
 class FasttextModel(Embeddings):
