@@ -1,3 +1,4 @@
+from typing import Iterable
 import fasttext
 from sklearn.decomposition import PCA
 import numpy as np
@@ -22,7 +23,9 @@ class Embeddings:
         """
         pass
 
-    def get_mean_vector(self, tokens, use_output_vecs=False):
+    def get_mean_vector(
+        self, tokens: list[str], use_output_vecs: bool = False
+    ) -> Iterable:
         """
         returns the mean pooled embeddings for a list of tokens
         tokens: list of tokens whose embeddings are mean pooled
@@ -41,18 +44,13 @@ class Embeddings:
             raise ValueError("None of the tokens are known")
         return np.mean(embeddings, axis=0)
 
-    def get_input_vector(self, token, pos=None):
+    def get_input_vector(
+        self, token: str, exclude_sent: Sentence | None = None, pos: str | None = None
+    ) -> Iterable:
         """
         returns the standard embeddings
         :param token: token for which embeddings are returned
         :param pos: part of speech of the token if known
-        """
-        return token
-
-    def get_output_vector(self, token):
-        """
-        returns the output embeddings(word2vec) if available
-        token: token for which embeddings are returned
         """
         return token
 
@@ -319,7 +317,7 @@ class BertEmbeddings(Embeddings):
             print(tokens)
         return torch.stack(embeddings).mean(dim=0)
 
-    def get_input_vector(self, token, pos=None, exclude_sent=None):
+    def get_input_vector(self, token: str, pos: str | None = None, exclude_sent=None):
         """
         returns the contextual embeddings by mean pooling word net examples for the token
 
@@ -331,22 +329,23 @@ class BertEmbeddings(Embeddings):
             return self.lookup_table[(token, pos)]
         sentences = []
         for synset in wn.synsets(token):
-            if not pos or synset.pos() == pos:
+            if synset and not pos or synset.pos() == pos:
                 for example in synset.examples():
-
                     try:
                         sent = Sentence(example, target=token, value=1, pos=pos)
                     except ValueError:
                         continue
                     if not exclude_sent or sent.sentence != exclude_sent.sentence:
                         sentences.append(sent)
+                    if exclude_sent and sent.sentence == exclude_sent.sentence:
+                        breakpoint()
         vecs = [self.get_sentence_vector(sentence) for sentence in sentences]
         if len(vecs) == 0:
-            if pos == ["n"]:
+            if pos == "n":
                 sentence = "This is a " + token + "."
-            elif pos == ["v"]:
+            elif pos == "v":
                 sentence = "I can " + token + "."
-            elif pos == ["a"]:
+            elif pos == "a":
                 sentence = "It's a " + token + " thing."
             else:
                 sentence = "What is the meaning of " + token + "?"
