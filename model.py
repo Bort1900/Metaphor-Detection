@@ -146,12 +146,14 @@ class NThresholdModel:
 
     def nfold_cross_validate(
         self,
-        data: list[Sentence],
         n: int,
+        data: list[Sentence] = None,
         save_file: str = None,
         by_pos: list[str] = None,
         by_phrase: bool = False,
         exclude_extremes: tuple[float, float] = None,
+        training_increment: float = 0.01,
+        training_epochs: int = 10,
     ):
         """
         performs nfold cross validation for the model and returns the mean evaluation measures
@@ -160,39 +162,52 @@ class NThresholdModel:
         :param save_file: filepath for possible storing
         :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
         :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
+        :param data: list of sentences to evaluate if specified else model test set
         :param exclude_extremes: if the threshold training should exclude extremes
+        :param training_increment: learning rate for training threshold
+        :param training_epochs: number of epochs for training threshold for each fold
         """
-        mean_thresholds = [0 for _ in range(len(self.decision_thresholds))]
-        output = dict()
+        if not data:
+            data = self.test_data
+        all_scores = dict()
         for i in range(n):
             print(f"Fold {i+1}:")
             test_split, train_split = DataSet.get_ith_split(i, n, data)
             self.train_thresholds(
-                0.01,
-                5,
-                train_split,
+                increment=training_increment,
+                epochs=training_epochs,
+                data=train_split,
                 by_phrase=by_phrase,
                 exclude_extremes=exclude_extremes,
             )
             scores = self.evaluate(test_split, by_pos=by_pos, by_phrase=by_phrase)
-            for j in range(len(mean_thresholds)):
-                mean_thresholds[j] += self.decision_thresholds[j]
-            for measure in scores:
-                if measure in output:
-                    output[measure] += scores[measure]
+            if "decision_thresholds" in all_scores:
+                all_scores["decision_thresholds"].append(self.decision_thresholds)
+            else:
+                all_scores["decision_thresholds"] = [self.decision_thresholds]
+            for score in scores:
+                if score in all_scores:
+                    all_scores[score].append(scores[score])
                 else:
-                    output[measure] = scores[measure]
-        for j in range(len(mean_thresholds)):
-            mean_thresholds[j] /= n
-        for measure in output:
-            output[measure] /= n
+                    all_scores[score] = [scores[score]]
+        output = dict()
+        for score in all_scores:
+            if score == "decision_thresholds":
+                output[score] = {
+                    "all": all_scores[score],
+                    "mean": np.mean(all_scores[score], axis=0),
+                    "standard_deviation": np.std(all_scores[score], axis=0),
+                }
+            else:
+                output[score] = {
+                    "all": all_scores[score],
+                    "mean": float(np.mean(all_scores[score])),
+                    "standard_deviation": float(np.std(all_scores[score])),
+                }
         if save_file:
             with open(save_file, "w", encoding="utf-8") as write_file:
-                write_file.write(
-                    "Mean decision thresholds: " + str(mean_thresholds)[1:-1] + "\n"
-                )
                 write_file.write(str(output))
-        return scores
+        return output
 
     def predict(self, sentence, by_phrase=False):
         """
@@ -277,7 +292,7 @@ class NThresholdModel:
                 try:
                     if len(candidate.split("_")) > 1 and self.mean_multi_word:
                         candidate_vector = self.fit_embeddings.get_mean_vector(
-                            tokens=candidate.split("_"), use_input_vecs=True
+                            tokens=candidate.split("_"), use_output_vecs=False
                         )
                     else:
                         candidate_vector = self.fit_embeddings.get_input_vector(
