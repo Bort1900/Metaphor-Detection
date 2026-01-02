@@ -11,7 +11,7 @@ import os
 from tqdm import tqdm
 import torch
 import random
-from transformers import BertModel, BertTokenizer
+from transformers import BertModel, BertTokenizerFast
 from gensim.models import Word2Vec, KeyedVectors
 
 
@@ -83,15 +83,21 @@ class FasttextModel(Embeddings):
         """
         word_id = self.model.get_word_id(token)
         if word_id == -1:
-            spare_candidates = [
-                candidate
-                for candidate in self.wn_interface.get_candidate_set(token=token)
-                if self.model.get_word_id(candidate) >= 0
-            ]
-            if len(spare_candidates) == 0:
-                raise ValueError(
-                    f"Could not create output vector for unseen word{token}"
-                )
+            pool = [token]
+            spare_candidates = []
+            while len(spare_candidates) == 0:
+                pool += [
+                    candidate
+                    for pool_candidate in pool
+                    for candidate in self.wn_interface.get_candidate_set(
+                        token=pool_candidate
+                    )
+                ]
+                spare_candidates += [
+                    candidate
+                    for candidate in pool
+                    if self.model.get_word_id(candidate) >= 0
+                ]
             return self.get_mean_vector(tokens=spare_candidates, use_output_vecs=True)
         return self.output_matrix[word_id]
 
@@ -212,7 +218,7 @@ class BertEmbeddings(Embeddings):
         )
         if torch.cuda.is_available():
             self.model.to(torch.device("cuda"))
-        self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+        self.tokenizer = BertTokenizerFast.from_pretrained("bert-base-uncased")
         self.lookup_table = dict()
         self.use_phrase_embedding = use_phrase_embedding
         self.mean_weights = mean_weights
@@ -224,24 +230,38 @@ class BertEmbeddings(Embeddings):
         """
         if self.use_phrase_embedding and sentence.phrase != "unknown":
             return self.get_phrase_embedding(sentence)
-        tokenized = self.tokenizer(sentence.sentence, return_tensors="pt")
+        tokenized = self.tokenizer(
+            sentence.tokens, return_tensors="pt", is_split_into_words=True
+        )
+        word_ids = tokenized.word_ids()
         if torch.cuda.is_available():
             tokenized.to("cuda")
         with torch.no_grad():
             output = self.model(**tokenized)
         if type(sentence.target_index) != int:
+            subtoken_indices = [
+                subtoken_index
+                for subtoken_index, token_index in enumerate(word_ids)
+                if token_index in sentence.target_index
+            ]
             return torch.stack(
                 [
-                    output.hidden_states[layer][0, i + 1]
+                    output.hidden_states[layer][0, i]
                     for layer in self.layers
-                    for i in sentence.target_index
+                    for i in subtoken_indices
                 ]
             ).mean(dim=0)
         else:
+            subtoken_indices = [
+                subtoken_index
+                for subtoken_index, token_index in enumerate(word_ids)
+                if token_index == sentence.target_index
+            ]
             return torch.stack(
                 [
-                    output.hidden_states[layer][0, sentence.target_index + 1]
+                    output.hidden_states[layer][0, i]
                     for layer in self.layers
+                    for i in subtoken_indices
                 ]
             ).mean(dim=0)
 
