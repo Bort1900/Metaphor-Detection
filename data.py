@@ -126,7 +126,9 @@ class DataSet:
         )
 
     @staticmethod
-    def get_splits(proportions: list[float], data: list[Sentence], seed: int = 0)->list[list[Sentence]]:
+    def get_splits(
+        proportions: list[float], data: list[Sentence], seed: int = 0
+    ) -> list[list[Sentence]]:
         """
         returns train, dev and test splits of the data as a list of three lists
         :param proportions: proportions of splits of whole data should add to 1
@@ -179,3 +181,26 @@ class Vectors:
             # breakpoint()
             return 0
         return float(np.dot(vec1, vec2) / denominator)
+
+    @staticmethod
+    def get_next_commutation(current_commutation: list[int], n: int) -> list[int]:
+        """
+        lists the next commutation for n choose k where k is the length of current_commutation
+
+        :param current_commutation: a commutation of n choose k as a list of k values
+        """
+        k = len(current_commutation)
+        current_commutation.sort()
+        if current_commutation[k - 1] >= n:
+            raise ValueError("commutations out of bounds")
+        for i in range(k - 1, -1, -1):
+            if i == k - 1 and (current_commutation[i]) < n - 1:
+                current_commutation[i] += 1
+                return current_commutation
+            elif i < k - 1 and current_commutation[i] < current_commutation[i + 1] - 1:
+                current_commutation[i] += 1
+                for j in range(i + 1, k):
+                    current_commutation[j] = current_commutation[i] + j - i
+                return current_commutation
+            elif i == 0:
+                raise ValueError("commutations out of bounds")
