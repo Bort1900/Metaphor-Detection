@@ -32,14 +32,14 @@ class Embeddings:
         tokens: list of tokens whose embeddings are mean pooled
         use_output_vecs: whether to use input or output vectors
         """
+        embeddings = []
         if use_output_vecs:
             for token in tokens:
                 try:
-                    embeddings = [self.get_output_vector(token) for token in tokens]
+                    embeddings.append(self.get_output_vector(token))
                 except ValueError:
                     continue
         else:
-            embeddings = []
             for token in tokens:
                 try:
                     embeddings.append(self.get_input_vector(token))
@@ -116,7 +116,8 @@ class FasttextModel(Embeddings):
                     for candidate in pool
                     if self.model.get_word_id(candidate) >= 0
                 ]
-                if len(spare_candidates) == 0 and len(pool) == pool_size:
+                if len(spare_candidates) == 0 and len(pool) <= pool_size + 1:
+                    print(pool)
                     raise ValueError("Could not create embedding for unknowwn word")
             return self.get_mean_vector(tokens=spare_candidates, use_output_vecs=True)
         return self.output_matrix[word_id]
