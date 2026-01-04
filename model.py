@@ -1,7 +1,7 @@
 from cProfile import label
 import random
 from turtle import pos
-
+from typing import Self
 from sklearn.metrics import confusion_matrix
 from data import Vectors
 import numpy as np
@@ -58,7 +58,7 @@ class NThresholdModel:
         self.cos = CosineSimilarity(dim=0, eps=1e-6)
 
     @staticmethod
-    def calculate_scores(confusion_matrix: np.ndarray) -> dict:
+    def calculate_scores(confusion_matrix: np.ndarray) -> dict[str, float]:
         """
         calculates and returns precision, recall, and f-score metrics for a given evaluation as a dictionary
         :param confusion_matrix: result of the evaluation, prediction vs actual classes
@@ -156,6 +156,7 @@ class NThresholdModel:
         save_file: str | None = None,
         by_pos: list[str] | None = None,
         by_phrase: bool = False,
+        metrics: list[str] = ["macro_f_1"],
     ):
         """
         performs nfold cross validation for the model and returns the mean evaluation measures
@@ -165,16 +166,16 @@ class NThresholdModel:
         :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
         :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
         :param data: list of sentences to evaluate if specified else model test set
+        :param metrics: metric according to which to train the optimum threshold, sum of them if more than 1
         """
         if not data:
             data = self.test_data
         all_scores = dict()
         for i in range(n):
             print(f"Fold {i+1}:")
-            test_split, train_split = DataSet.get_ith_split(i, n, data)
+            train_split, test_split = DataSet.get_ith_split(i, n, data)
             self.train_thresholds(
-                data=train_split,
-                by_phrase=by_phrase,
+                data=train_split, by_phrase=by_phrase, metrics=metrics
             )
             scores = self.evaluate(test_split, by_pos=by_pos, by_phrase=by_phrase)
             if "decision_thresholds" in all_scores:
@@ -192,12 +193,14 @@ class NThresholdModel:
                 output[score] = {
                     "all": all_scores[score],
                     "mean": np.mean(all_scores[score], axis=0),
+                    "median": np.median(all_scores[score], axis=0),
                     "standard_deviation": np.std(all_scores[score], axis=0),
                 }
             else:
                 output[score] = {
                     "all": all_scores[score],
                     "mean": float(np.mean(all_scores[score])),
+                    "median": float(np.median(all_scores[score])),
                     "standard_deviation": float(np.std(all_scores[score])),
                 }
         if save_file:
@@ -317,6 +320,7 @@ class NThresholdModel:
 
     def train_thresholds(
         self,
+        metrics: list[str],
         data: list[Sentence] | None = None,
         by_pos: list[str] | None = None,
         by_phrase: bool = False,
@@ -326,6 +330,7 @@ class NThresholdModel:
         :param data: list of sentences to train on, defaults to dev data
         :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
         :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
+        :param metrics: metric according to which to train the optimum threshold, sum of them if more than 1
         """
         if not data:
             data = self.train_dev_data
@@ -354,26 +359,27 @@ class NThresholdModel:
         best_threshold = [
             possible_thresholds[i] for i in range(len(self.decision_thresholds))
         ]
-        commutation_number: int = int(comb(
-            N=len(possible_thresholds), k=len(self.decision_thresholds)
-        ))
+        commutation_number: int = int(
+            comb(N=len(possible_thresholds), k=len(self.decision_thresholds))
+        )
         current_commutation = [i for i in range(len(self.decision_thresholds))]
-        for _ in range(commutation_number):
+        for commutation in tqdm(range(commutation_number)):
             current_thresholds = [possible_thresholds[i] for i in current_commutation]
             confusion_matrix = self.get_confusion_matrix(
                 scores=all_scores, labels=labels, thresholds=current_thresholds
             )
-            f_score = self.calculate_scores(confusion_matrix=confusion_matrix)[
-                "macro_f_1"
-            ]
-            if f_score > best_f_score:
+            threshold_scores = self.calculate_scores(confusion_matrix=confusion_matrix)
+            threshold_result = sum([threshold_scores[metric] for metric in metrics])
+            print(current_thresholds, confusion_matrix, threshold_result)
+            if threshold_result > best_f_score:
                 best_threshold = current_thresholds
-                best_f_score = f_score
-            current_commutation = Vectors.get_next_commutation(
-                current_commutation=current_commutation, n=len(possible_thresholds)
-            )
-        self.decision_thresholds = [best_threshold]
-        print(f"Best Thresholds: {self.decision_thresholds}")
+                best_f_score = threshold_result
+            if commutation < commutation_number - 1:
+                current_commutation = Vectors.get_next_commutation(
+                    current_commutation=current_commutation, n=len(possible_thresholds)
+                )
+        self.decision_thresholds = best_threshold
+        print(f"Best Thresholds: {self.decision_thresholds}\nBest score:{best_f_score}")
 
     @staticmethod
     def get_confusion_matrix(
@@ -480,6 +486,10 @@ class NThresholdModel:
         fig, ax = plt.subplots()
         if graph_type == "boxplot":
             ax.boxplot(datapoints, tick_labels=labels, orientation="horizontal")
+
+            for i, class_data in enumerate(datapoints, start=1):
+                med = np.median(class_data)
+                ax.text(med, i, f"{med:.2f}", ha="left", va="center")
         elif graph_type == "scatter":
             for i in range(self.num_classes):
                 ax.scatter(
@@ -890,55 +900,68 @@ class ComparingModel(NThresholdModel):
 
     def train_thresholds(
         self,
-        increment: float,
-        epochs: int,
         data: list[Sentence] | None = None,
         by_pos: list[str] | None = None,
         by_phrase: bool = False,
-        exclude_extremes: tuple[float, float] | None = None,
     ):
         """
         :param trains the model's threshold on the dev_data
-        :param increment: how much the threshold should be changed on a wrong prediction
-        :param epochs: number of times the dev_data is run through the training process
         :param data: list of sentences to evaluate if specified else model train set
         :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
         :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
-        :param exclude_extremes: irrelevant
         """
         if not data:
             data = self.train_dev_data
         ignore_count = 0
         self.estimate_map_factor(by_pos=by_pos)
-        data_per_class = [
-            [sentence for sentence in data if sentence.value == i]
-            for i in range(self.num_classes)
+        scores = dict()
+        labels = dict()
+        for i, sentence in enumerate(tqdm(data)):
+            if by_pos and sentence.pos not in by_pos:
+                continue
+            try:
+                scores[i] = self.get_compare_value(sentence, by_phrase=by_phrase)
+                labels[i] = sentence.value
+            except ValueError:
+                print(f"{sentence.target} not in dictionary, ignoring sentence")
+                continue
+        sorted_scores = sorted(scores.keys(), key=lambda x: scores[x])
+        labels = [labels[score] for score in sorted_scores]
+        all_scores = [scores[score] for score in scores]
+        last_score = -1
+        possible_thresholds = []
+        for score in sorted_scores:
+            score = scores[score]
+            if score != last_score:
+                possible_thresholds.append((score + last_score) / 2)
+            last_score = score
+        best_f_score = 0
+        best_threshold = [
+            possible_thresholds[i] for i in range(len(self.decision_thresholds))
         ]
-        num_per_class = math.floor(len(data) / self.num_classes)
-        for epoch in range(epochs):
-            print(f"Epoch {epoch+1}")
-            sentences = []
-            for class_data in data_per_class:
-                sentences += random.choices(population=class_data, k=num_per_class)
-            random.shuffle(sentences)
-            for sentence in tqdm(sentences):
-                if by_pos and sentence.pos not in by_pos:
-                    continue
-                try:
-                    comp_value = self.get_compare_value(sentence, by_phrase=by_phrase)
-                    prediction = int(self.predict(sentence, by_phrase=by_phrase))
-                except ValueError:
-                    ignore_count += 1
-                    continue
-                if prediction != sentence.value:
-                    for i, threshold in enumerate(self.decision_thresholds):
-                        if comp_value > threshold and sentence.value <= i:
-                            self.decision_thresholds[i] += increment
-                        if comp_value < threshold and sentence.value > i:
-                            self.decision_thresholds[i] -= increment
-                self.decision_thresholds.sort()
-            print(f"ignored {ignore_count} of {len(sentences)}")
-            print(f"Current Thresholds: {self.decision_thresholds}")
+        commutation_number: int = int(
+            comb(N=len(possible_thresholds), k=len(self.decision_thresholds))
+        )
+        current_commutation = [i for i in range(len(self.decision_thresholds))]
+        for commutation in tqdm(range(commutation_number)):
+            current_thresholds = [possible_thresholds[i] for i in current_commutation]
+            confusion_matrix = self.get_confusion_matrix(
+                scores=all_scores, labels=labels, thresholds=current_thresholds
+            )
+            f_score = self.calculate_scores(confusion_matrix=confusion_matrix)[
+                "macro_f_1"
+            ]
+            if f_score > best_f_score:
+                best_threshold = current_thresholds
+                best_f_score = f_score
+            if commutation < commutation_number - 1:
+                current_commutation = Vectors.get_next_commutation(
+                    current_commutation=current_commutation, n=len(possible_thresholds)
+                )
+        self.decision_thresholds = best_threshold
+        print(
+            f"Best Thresholds: {self.decision_thresholds}\nBest F_score:{best_f_score}"
+        )
 
 
 class RandomBaseline(NThresholdModel):
@@ -981,3 +1004,66 @@ class RandomBaseline(NThresholdModel):
         )
         candidate_set.add(sentence.target_token)
         return random.choice(list(candidate_set))
+
+
+class Models:
+    """
+    Class for some helper methods
+    """
+
+    @staticmethod
+    def get_recall_curve(
+        data: list[Sentence],
+        save_file: str,
+        models: list[NThresholdModel],
+        graph_labels: list[str],
+        by_pos: list[str] | None = None,
+        by_phrase: bool = False,
+    ):
+        """
+        draws the false positive rate against true positive rates for multiple binary prediction models against each other
+
+        :param data: data on which to evaluate
+        :param save_file: where the plot will be stored
+        :param models: list of models to plot against each other
+        :param graph_labels: labels for plot of each model
+        :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
+        :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
+        """
+        fig, ax = plt.subplots()
+        ax.plot([0, 1], [0, 1], label="random baseline")
+        for j, model in enumerate(models):
+            if model.num_classes != 2:
+                raise ValueError("only works for binary models")
+            class_counts = [0, 0]
+            scores = dict()
+            labels = dict()
+            for i, sentence in enumerate(tqdm(data)):
+                if by_pos and sentence.pos not in by_pos:
+                    continue
+                try:
+                    scores[i] = model.get_compare_value(sentence, by_phrase=by_phrase)
+                    class_counts[sentence.value] += 1
+                    labels[i] = sentence.value
+                except ValueError:
+                    print(f"{sentence.target} not in dictionary, ignoring sentence")
+                    continue
+            sorted_score_indices = sorted(scores.keys(), key=lambda x: scores[x])
+            true_pos_rates = []
+            false_pos_rates = []
+            true_count = 0
+            false_count = 0
+            for i, score_index in enumerate(sorted_score_indices):
+                label = labels[score_index]
+                if label == 1:
+                    false_count += 1
+                else:
+                    true_count += 1
+                true_pos_rate = true_count / class_counts[0]
+                false_pos_rate = false_count / class_counts[1]
+                true_pos_rates.append(true_pos_rate)
+                false_pos_rates.append(false_pos_rate)
+            plt.plot(false_pos_rates, true_pos_rates, label=graph_labels[j])
+        plt.legend()
+        plt.savefig(save_file, bbox_inches="tight")
+        plt.close()
