@@ -117,7 +117,6 @@ class FasttextModel(Embeddings):
                     if self.model.get_word_id(candidate) >= 0
                 ]
                 if len(spare_candidates) == 0 and len(pool) <= pool_size *2:
-                    print(pool)
                     raise ValueError("Could not create embedding for unknowwn word")
             return self.get_mean_vector(tokens=spare_candidates, use_output_vecs=True)
         return self.output_matrix[word_id]

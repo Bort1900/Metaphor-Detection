@@ -189,19 +189,24 @@ class NThresholdModel:
                     all_scores[score] = [scores[score]]
         output = dict()
         for score in all_scores:
+            result = (
+                all_scores[score].cpu()
+                if type(all_scores[score]) == torch.Tensor
+                else all_scores[score]
+            )
             if score == "decision_thresholds":
                 output[score] = {
-                    "all": all_scores[score],
-                    "mean": np.mean(all_scores[score], axis=0),
-                    "median": np.median(all_scores[score], axis=0),
-                    "standard_deviation": np.std(all_scores[score], axis=0),
+                    "all": result,
+                    "mean": np.mean(result, axis=0),
+                    "median": np.median(result, axis=0),
+                    "standard_deviation": np.std(result, axis=0),
                 }
             else:
                 output[score] = {
-                    "all": all_scores[score],
-                    "mean": float(np.mean(all_scores[score])),
-                    "median": float(np.median(all_scores[score])),
-                    "standard_deviation": float(np.std(all_scores[score])),
+                    "all": result,
+                    "mean": float(np.mean(result)),
+                    "median": float(np.median(result)),
+                    "standard_deviation": float(np.std(result)),
                 }
         if save_file:
             with open(save_file, "w", encoding="utf-8") as write_file:
@@ -370,7 +375,6 @@ class NThresholdModel:
             )
             threshold_scores = self.calculate_scores(confusion_matrix=confusion_matrix)
             threshold_result = sum([threshold_scores[metric] for metric in metrics])
-            print(current_thresholds, confusion_matrix, threshold_result)
             if threshold_result > best_f_score:
                 best_threshold = current_thresholds
                 best_f_score = threshold_result
@@ -1006,6 +1010,7 @@ class RandomBaseline(NThresholdModel):
         return random.choice(list(candidate_set))
 
 
+
 class Models:
     """
     Class for some helper methods
@@ -1031,7 +1036,6 @@ class Models:
         :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
         """
         fig, ax = plt.subplots()
-        ax.plot([0, 1], [0, 1], label="random baseline")
         for j, model in enumerate(models):
             if model.num_classes != 2:
                 raise ValueError("only works for binary models")
