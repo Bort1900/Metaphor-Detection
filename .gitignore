@@ -7,4 +7,5 @@
 *.tsv
 model_distributions
 model_evaluations
+recall_curves
 __pycache__
