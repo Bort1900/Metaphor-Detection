@@ -2,6 +2,7 @@ from typing import Self, overload
 import fasttext
 from sklearn.decomposition import PCA
 import numpy as np
+from torch import Value
 from wordnet_interface import WordNetInterface
 from swow_interface import SWOWInterface
 from nltk.corpus import wordnet as wn
@@ -32,7 +33,11 @@ class Embeddings:
         use_output_vecs: whether to use input or output vectors
         """
         if use_output_vecs:
-            embeddings = [self.get_output_vector(token) for token in tokens]
+            for token in tokens:
+                try:
+                    embeddings = [self.get_output_vector(token) for token in tokens]
+                except ValueError:
+                    continue
         else:
             embeddings = []
             for token in tokens:
@@ -98,6 +103,7 @@ class FasttextModel(Embeddings):
             pool = [token]
             spare_candidates = []
             while len(spare_candidates) == 0:
+                pool_size = len(pool)
                 pool += [
                     candidate
                     for pool_candidate in pool
@@ -110,6 +116,8 @@ class FasttextModel(Embeddings):
                     for candidate in pool
                     if self.model.get_word_id(candidate) >= 0
                 ]
+                if len(spare_candidates) == 0 and len(pool) == pool_size:
+                    raise ValueError("Could not create embedding for unknowwn word")
             return self.get_mean_vector(tokens=spare_candidates, use_output_vecs=True)
         return self.output_matrix[word_id]
 
