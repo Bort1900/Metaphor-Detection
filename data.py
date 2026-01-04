@@ -204,3 +204,4 @@ class Vectors:
                 return current_commutation
             elif i == 0:
                 raise ValueError("commutations out of bounds")
+        return current_commutation

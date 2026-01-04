@@ -1,4 +1,4 @@
-from typing import Iterable
+from typing import Self, overload
 import fasttext
 from sklearn.decomposition import PCA
 import numpy as np
@@ -25,7 +25,7 @@ class Embeddings:
 
     def get_mean_vector(
         self, tokens: list[str], use_output_vecs: bool = False
-    ) -> Iterable:
+    ) -> np.ndarray:
         """
         returns the mean pooled embeddings for a list of tokens
         tokens: list of tokens whose embeddings are mean pooled
@@ -42,29 +42,29 @@ class Embeddings:
                     continue
         if len(embeddings) == 0:
             raise ValueError("None of the tokens are known")
-        return np.mean(embeddings, axis=0)
+        return np.mean(a=embeddings, axis=0)
 
     def get_input_vector(
         self, token: str, exclude_sent: Sentence | None = None, pos: str | None = None
-    ) -> Iterable:
+    ) -> np.ndarray:
         """
         returns the standard embeddings
         :param token: token for which embeddings are returned
         :param pos: part of speech of the token if known
         """
-        return [0]
+        return np.zeros([1])
 
-    def get_output_vector(self, token: str) -> Iterable:
+    def get_output_vector(self, token: str) -> np.ndarray:
         """
         returns the output embedding for the token(word2vec)
 
         :param token: token for which embedding is returned
         """
-        return [0]
+        return np.zeros([1])
 
 
 class FasttextModel(Embeddings):
-    def __init__(self, load_file):
+    def __init__(self, load_file: str):
         """
         Wrapper for Fasttext embeddings
         load_file: filepath where model is stored
@@ -74,15 +74,21 @@ class FasttextModel(Embeddings):
         self.output_matrix = self.model.get_output_matrix()
         self.wn_interface = WordNetInterface()
 
-    def get_input_vector(self, token, pos=None):
+    def get_input_vector(
+        self,
+        token: str,
+        exclude_sent: Sentence | None = None,
+        pos: str | None = None,
+    ) -> np.ndarray:
         """
         returns fasttext word embedding
         :param token: word for which embedding is given
         :param pos: irrelevant
+        :param exclude_sent: irrelevant
         """
         return self.model.get_word_vector(token)
 
-    def get_output_vector(self, token):
+    def get_output_vector(self, token: str) -> np.ndarray:
         """
         returns the fasttext output embeddings if available (mean pooling from synonyms,hypernyms if unseen word)
         token: word for which embeddings is given
@@ -122,7 +128,7 @@ class FasttextModel(Embeddings):
 
 
 class WordAssociationEmbeddings(Embeddings):
-    def __init__(self, swow, index_file, embedding_file):
+    def __init__(self, swow: SWOWInterface, index_file: str, embedding_file: str):
         """
         Class for graph embeddings for Word Association strength graph
         swow: SWOWInterface instance that is used for creating the embeddings
@@ -132,14 +138,15 @@ class WordAssociationEmbeddings(Embeddings):
         self.swow = swow
         self.load(index_file, embedding_file)
 
-    @staticmethod
+    @classmethod
     def create_graph_embeddings(
-        swow,
-        index_file,
-        embedding_file,
-        use_only_cues,
-        alpha=0.75,
-        dimensions=-1,
+        cls,
+        swow: SWOWInterface,
+        index_file: str,
+        embedding_file: str,
+        use_only_cues: bool,
+        alpha: float = 0.75,
+        dimensions: int = -1,
     ):
         """
         returns and writes graph embeddings that are created for a given Word association strength graph
@@ -168,7 +175,7 @@ class WordAssociationEmbeddings(Embeddings):
             swow=swow, index_file=index_file, embedding_file=embedding_file
         )
 
-    def load(self, index_file, embedding_file):
+    def load(self, index_file: str, embedding_file: str):
         """
         loads the embeddings from save files
         index_file: where the cue and response indices are loaded from
@@ -180,11 +187,14 @@ class WordAssociationEmbeddings(Embeddings):
                 self.indices[line.strip()] = i
         self.embeddings = np.load(embedding_file)
 
-    def get_input_vector(self, token, pos=None):
+    def get_input_vector(
+        self, token: str, exclude_sent: Sentence | None = None, pos: str | None = None
+    ) -> np.ndarray:
         """
         returns embedding for a given cue from the association strength matrix (mean pooling from neighbours if response and only cues are used)
         token: the cue for which embedding is given
         :param pos: irrelevant
+        :param exclude_sent: irrelevant
         """
         if token in self.indices:
             token_index = self.indices[token]
@@ -208,10 +218,15 @@ class WordAssociationEmbeddings(Embeddings):
 
 
 class BertEmbeddings(Embeddings):
-    def __init__(self, layers, use_phrase_embedding=None, mean_weights=None):
+    def __init__(
+        self,
+        layers: list[int],
+        use_phrase_embedding: str | None = None,
+        mean_weights: list[float] = [],
+    ):
         """
         Wrapper for Bert Embeddings
-        layer: list of which layer(s) of the hidden layers to use as embeddings
+        :param layer: list of which layer(s) of the hidden layers to use as embeddings
         :param use_phrase_embedding: whether to generate embedding for whole phrase or just target word, also specifies the meaning method: "mean","weighted","max","concat", if "weighted" needs to specify weights as "mean_weights"
         :param mean_weights: weights for verb and object embeddings for weighted mean when using "weighted" as phrase_embedding
 
@@ -309,7 +324,9 @@ class BertEmbeddings(Embeddings):
             )
         return phrase_embedding
 
-    def get_mean_vector(self, tokens, use_output_vecs=True):
+    def get_mean_vector(
+        self, tokens: list[str], use_output_vecs: bool = True
+    ) -> torch.Tensor:
         """
         returns mean pooled embedding for a list of tokens
         :param tokens: list of tokens whose embeddings are mean pooled
@@ -325,7 +342,9 @@ class BertEmbeddings(Embeddings):
             print(tokens)
         return torch.stack(embeddings).mean(dim=0)
 
-    def get_input_vector(self, token: str, pos: str | None = None, exclude_sent=None):
+    def get_input_vector(
+        self, token: str, pos: str | None = None, exclude_sent=None
+    ) -> torch.Tensor:
         """
         returns the contextual embeddings by mean pooling word net examples for the token
 
@@ -337,15 +356,21 @@ class BertEmbeddings(Embeddings):
             return self.lookup_table[(token, pos)]
         sentences = []
         for synset in wn.synsets(token):
-            if synset and not pos or synset.pos() == pos:
+            if synset and (not pos or synset.pos() == pos):
                 for example in synset.examples():
                     try:
                         sent = Sentence(example, target=token, value=1, pos=pos)
                     except ValueError:
                         continue
-                    if not exclude_sent or sent.sentence != exclude_sent.sentence:
+                    if (
+                        not exclude_sent
+                        or sent.sentence != exclude_sent.sentence.strip()
+                    ):
                         sentences.append(sent)
-                    if exclude_sent and sent.sentence == exclude_sent.sentence:
+                    if (
+                        exclude_sent
+                        and exclude_sent.sentence.strip() == sent.sentence.strip()
+                    ):
                         breakpoint()
         vecs = [self.get_sentence_vector(sentence) for sentence in sentences]
         if len(vecs) == 0:
@@ -398,11 +423,17 @@ class Node2VecEmbeddings(Embeddings):
         self.wordvectors = KeyedVectors.load(loadfile)
         self.swow = swow
 
-    def get_input_vector(self, token, pos=None):
+    def get_input_vector(
+        self,
+        token: str,
+        exclude_sent: Sentence | None = None,
+        pos: str | None = None,
+    ):
         """
         returns the standard embeddings
         :param token: token for which embeddings are returned
         :param pos: irrelevant
+        :param exclude_sent: irrelevant
         """
         if token in self.wordvectors:
             return self.wordvectors[token]
