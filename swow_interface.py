@@ -355,15 +355,10 @@ class SWOWInterface:
         ):
             return 0
         cue_index = self.combined_cue_response_indices[word_1]
-        if word_2 == word_1:
-            strength += np.max(self.association_strength_matrix[cue_index])
-            if not directional:
-                strength += np.max(self.association_strength_matrix[:, cue_index])
-        else:
-            response_index = self.combined_cue_response_indices[word_2]
-            strength += self.association_strength_matrix[cue_index, response_index]
-            if not directional:
-                strength += self.association_strength_matrix[response_index, cue_index]
+        response_index = self.combined_cue_response_indices[word_2]
+        strength += self.association_strength_matrix[cue_index, response_index]
+        if not directional:
+            strength += self.association_strength_matrix[response_index, cue_index]
         return strength
 
     def get_association_strength_matrix(self, use_only_cues=True):
