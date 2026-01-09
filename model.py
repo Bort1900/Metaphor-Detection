@@ -189,12 +189,12 @@ class NThresholdModel:
                     all_scores[score] = [scores[score]]
         output = dict()
         for score in all_scores:
-            result = (
-                all_scores[score].cpu()
-                if type(all_scores[score]) == torch.Tensor
-                else all_scores[score]
-            )
+            result = all_scores[score]
             if score == "decision_thresholds":
+                if type(result[0][0]) == torch.Tensor:
+                    for thresholds in result:
+                        for i in range(len(thresholds)):
+                            thresholds[i] = thresholds[i].cpu()
                 output[score] = {
                     "all": result,
                     "mean": np.mean(result, axis=0),
@@ -202,6 +202,8 @@ class NThresholdModel:
                     "standard_deviation": np.std(result, axis=0),
                 }
             else:
+                if type(result[0]) == torch.Tensor:
+                    result = [value.cpu() for value in result]
                 output[score] = {
                     "all": result,
                     "mean": float(np.mean(result)),
@@ -708,14 +710,15 @@ class ContextualMaoModel(NThresholdModel):
         compare_vector = self.get_compare_embedding(sentence, by_phrase)
         best_candidate = sentence.target
         for candidate in candidate_set:
-            if len(candidate.split("_")) > 1 and self.mean_multi_word:
-                candidate_vector = self.fit_embeddings.get_mean_vector(
-                    tokens=candidate.split("_")
-                )
-            else:
-                candidate_vector = self.fit_embeddings.get_input_vector(
-                    candidate, pos=sentence.pos
-                )
+            try:
+                if len(candidate.split("_")) > 1 and self.mean_multi_word:
+                    candidate_vector = self.fit_embeddings.get_mean_vector(
+                        tokens=candidate.split("_")
+                    )
+                else:
+                    candidate_vector = self.fit_embeddings.get_input_vector(candidate)
+            except ValueError:
+                continue
             if self.fit_embeddings.use_phrase_embedding == "concat":
                 candidate_vector = torch.concat((candidate_vector, candidate_vector))
             similarity = self.cos(candidate_vector, compare_vector)
@@ -1010,7 +1013,6 @@ class RandomBaseline(NThresholdModel):
         return random.choice(list(candidate_set))
 
 
-
 class Models:
     """
     Class for some helper methods
@@ -1069,5 +1071,7 @@ class Models:
                 false_pos_rates.append(false_pos_rate)
             plt.plot(false_pos_rates, true_pos_rates, label=graph_labels[j])
         plt.legend()
+        plt.xlabel("False Positive Rate")
+        plt.ylabel("True Positive Rate")
         plt.savefig(save_file, bbox_inches="tight")
         plt.close()
