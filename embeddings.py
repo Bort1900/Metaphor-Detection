@@ -69,15 +69,17 @@ class Embeddings:
 
 
 class FasttextModel(Embeddings):
-    def __init__(self, load_file: str):
+    def __init__(self, load_file: str, fallback_source):
         """
         Wrapper for Fasttext embeddings
-        load_file: filepath where model is stored
+        :param load_file: filepath where model is stored
+        :param fallback_source: a candidate source instance to get the candidates for fallback for unseen output vectors
+
         """
         self.model = fasttext.load_model(load_file)
         self.load_file = load_file
         self.output_matrix = self.model.get_output_matrix()
-        self.wn_interface = WordNetInterface()
+        self.fallback_source = fallback_source
 
     def get_input_vector(
         self,
@@ -107,8 +109,8 @@ class FasttextModel(Embeddings):
                 pool += [
                     candidate
                     for pool_candidate in pool
-                    for candidate in self.wn_interface.get_candidate_set(
-                        token=pool_candidate
+                    for candidate in self.fallback_source.get_candidate_set(
+                        pool_candidate
                     )
                 ]
                 spare_candidates += [
@@ -116,7 +118,9 @@ class FasttextModel(Embeddings):
                     for candidate in pool
                     if self.model.get_word_id(candidate) >= 0
                 ]
-                if len(spare_candidates) == 0 and len(pool) <= pool_size *2:
+                if len(spare_candidates) == 0:
+                    breakpoint()
+                if len(spare_candidates) == 0 and len(pool) <= pool_size * 2:
                     raise ValueError("Could not create embedding for unknowwn word")
             return self.get_mean_vector(tokens=spare_candidates, use_output_vecs=True)
         return self.output_matrix[word_id]
