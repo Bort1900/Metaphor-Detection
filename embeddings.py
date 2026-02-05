@@ -9,6 +9,7 @@ from nltk.corpus import wordnet as wn
 from nltk.corpus import stopwords
 from data import Sentence
 import time
+from nltk.stem import WordNetLemmatizer
 import os
 from tqdm import tqdm
 import torch
@@ -118,10 +119,10 @@ class FasttextModel(Embeddings):
                     for candidate in pool
                     if self.model.get_word_id(candidate) >= 0
                 ]
-                if len(spare_candidates) == 0:
-                    breakpoint()
                 if len(spare_candidates) == 0 and len(pool) <= pool_size * 2:
                     raise ValueError("Could not create embedding for unknowwn word")
+                if len(spare_candidates) ==0:
+                    print(pool)
             return self.get_mean_vector(tokens=spare_candidates, use_output_vecs=True)
         return self.output_matrix[word_id]
 
@@ -149,6 +150,7 @@ class WordAssociationEmbeddings(Embeddings):
         """
         self.swow = swow
         self.load(index_file, embedding_file)
+        self.wnl = WordNetLemmatizer()
 
     @classmethod
     def create_graph_embeddings(
@@ -205,11 +207,16 @@ class WordAssociationEmbeddings(Embeddings):
         """
         returns embedding for a given cue from the association strength matrix (mean pooling from neighbours if response and only cues are used)
         token: the cue for which embedding is given
-        :param pos: irrelevant
+        :param pos: part-of-speech the token has
         :param exclude_sent: irrelevant
         """
         if token in self.indices:
             token_index = self.indices[token]
+            return self.embeddings[token_index]
+        elif self.wnl.lemmatize(token, pos=pos if pos else "n") in self.indices:
+            token_index = self.indices[
+                self.wnl.lemmatize(token, pos=pos if pos else "n")
+            ]
             return self.embeddings[token_index]
         else:
             neighbouring_nodes = self.swow.get_weighted_neighbours(token)
@@ -218,6 +225,7 @@ class WordAssociationEmbeddings(Embeddings):
                 raise KeyError(f"{token} is not in word association graph")
             map_factor = 1 / total
             weighted_mean = np.zeros_like(self.embeddings[0])
+            valid_neighbours_count = 0
             for neighbour in neighbouring_nodes:
                 if neighbour in self.indices:
                     neighbour_index = self.indices[neighbour]
@@ -226,6 +234,10 @@ class WordAssociationEmbeddings(Embeddings):
                         * self.embeddings[neighbour_index]
                         * map_factor
                     )
+                    valid_neighbours_count += 1
+            if valid_neighbours_count == 0:
+                print(neighbouring_nodes)
+
             return weighted_mean
 
 
@@ -434,22 +446,24 @@ class Node2VecEmbeddings(Embeddings):
         """
         self.wordvectors = KeyedVectors.load(loadfile)
         self.swow = swow
+        self.wnl = WordNetLemmatizer()
 
     def get_input_vector(
         self,
         token: str,
         exclude_sent: Sentence | None = None,
         pos: str | None = None,
-    ):
+    )->np.ndarray:
         """
         returns the standard embeddings
         :param token: token for which embeddings are returned
-        :param pos: irrelevant
+        :param pos: part-of-speech the token has
         :param exclude_sent: irrelevant
         """
         if token in self.wordvectors:
             return self.wordvectors[token]
-
+        elif self.wnl.lemmatize(token, pos=pos if pos else "n") in self.wordvectors:
+            return self.wordvectors[self.wnl.lemmatize(token, pos=pos if pos else "n")]
         else:
             neighbouring_nodes = self.swow.get_weighted_neighbours(token)
             total = sum([weight for weight in neighbouring_nodes.values()])
@@ -468,7 +482,7 @@ class Node2VecEmbeddings(Embeddings):
 
 
 class Node2VecEmbeddingsCreator:
-    def __init__(self, graph: SWOWInterface, is_directed=False, p=1, q=1):
+    def __init__(self, graph: SWOWInterface, is_directed:bool=False, p:float=1, q:float=1):
         """
         Class for creating Node2Vec Embeddings following the original implementation(slightly adapted) by Aditya Grover and Jure Leskovec.
         See https://github.com/aditya-grover/node2vec/tree/master
