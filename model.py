@@ -175,7 +175,7 @@ class NThresholdModel:
             print(f"Fold {i+1}:")
             train_split, test_split = DataSet.get_ith_split(i, n, data)
             self.train_thresholds(
-                data=train_split, by_phrase=by_phrase, metrics=metrics
+                data=train_split, by_phrase=by_phrase, metrics=metrics, by_pos=by_pos
             )
             scores = self.evaluate(test_split, by_pos=by_pos, by_phrase=by_phrase)
             if "decision_thresholds" in all_scores:
@@ -343,6 +343,7 @@ class NThresholdModel:
             data = self.train_dev_data
         scores = dict()
         labels = dict()
+        fail_count = 0
         for i, sentence in enumerate(tqdm(data)):
             if by_pos and sentence.pos not in by_pos:
                 continue
@@ -350,11 +351,19 @@ class NThresholdModel:
                 scores[i] = self.get_compare_value(sentence, by_phrase=by_phrase)
                 labels[i] = sentence.value
             except ValueError:
+                fail_count += 1
                 print(f"{sentence.target} not in dictionary, ignoring sentence")
                 continue
+        print(f"ignored {fail_count} sentences of {len(data)}")
         sorted_scores = sorted(scores.keys(), key=lambda x: scores[x])
-        labels = [labels[score] for score in sorted_scores]
-        all_scores = [scores[score] for score in scores]
+        sorted_labels = [labels[score] for score in sorted_scores]
+        all_scores = [scores[score_index] for score_index in sorted_scores]
+        sorted_scores_per_class = []
+        for i in range(self.num_classes):
+            sorted_scores_per_class.append([])
+            for score_index in sorted_scores:
+                if labels[score_index] == i:
+                    sorted_scores_per_class[i].append(scores[score_index])
         last_score = -1
         possible_thresholds = []
         for score in sorted_scores:
@@ -373,7 +382,7 @@ class NThresholdModel:
         for commutation in tqdm(range(commutation_number)):
             current_thresholds = [possible_thresholds[i] for i in current_commutation]
             confusion_matrix = self.get_confusion_matrix(
-                scores=all_scores, labels=labels, thresholds=current_thresholds
+                scores=sorted_scores_per_class, thresholds=current_thresholds
             )
             threshold_scores = self.calculate_scores(confusion_matrix=confusion_matrix)
             threshold_result = sum([threshold_scores[metric] for metric in metrics])
@@ -389,24 +398,38 @@ class NThresholdModel:
 
     @staticmethod
     def get_confusion_matrix(
-        scores: list[float], labels: list[int], thresholds: list[float]
+        scores: list[list[float]], thresholds: list[float]
     ) -> np.ndarray:
         """
         returns the confusion matrix that is given by prediction of classes for the scores with the corresponding labels and given the thresholds
 
-        :param scores: list of datapoints for which to predict a class
-        :param labels: list of labels corresponding to the actual class of the scores
+        :param scores: sorted lists of prediction scores per class
         :param thresholds: thresholds to predict classes
         """
-        num_classes = len(thresholds) + 1
+        num_classes = len(scores)
         confusion_matrix = np.zeros([num_classes, num_classes])
-        for i, score in enumerate(scores):
-            for j, threshold in enumerate(thresholds):
-                if score < threshold:
-                    confusion_matrix[j, labels[i]] += 1
-                    break
-                elif j == num_classes - 2:
-                    confusion_matrix[num_classes - 1, labels[i]] += 1
+        for j in range(num_classes):
+            indices=[0]
+            for i, threshold in enumerate(thresholds):
+                length = len(scores[j])
+                upper = length - 1
+                lower = 0
+                while upper - lower >= 1:
+                    index = math.ceil((upper + lower) / 2)
+                    if scores[j][index - 1] >= threshold:
+                        upper = index - 1
+                    elif scores[j][index] < threshold:
+                        lower = index + 1
+                    else:
+                        upper=index
+                        lower=index
+                if lower == length-1 and scores[j][lower]<threshold:
+                    lower=length
+                    upper=length
+                indices.append(lower)
+                confusion_matrix[i,j]=indices[i+1]-indices[i]
+                if i == num_classes-2:
+                    confusion_matrix[i+1,j]=length-indices[i+1]
         return confusion_matrix
 
     def evaluate_per_threshold(
@@ -521,6 +544,7 @@ class NThresholdModel:
 
 
 class MaoModel(NThresholdModel):
+
     def __init__(
         self,
         data: DataSet,

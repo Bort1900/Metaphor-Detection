@@ -137,12 +137,12 @@ class WordNetInterface:
         hypernyms = set()
         for synset in wn.synsets(token):
             if synset and synset.hypernyms() and (synset.pos() == pos or not pos):
-                hypernym = synset.hypernyms()[0]
-                lemmas = hypernym.lemma_names()
-                if len(lemmas) == 1 or lemmas[0] != token:
-                    hypernyms.add(lemmas[0])
-                else:
-                    hypernyms.add(lemmas[1])
+                for hypernym in synset.hypernyms():
+                    lemmas = hypernym.lemma_names()
+                    if len(lemmas) == 1 or lemmas[0] != token:
+                        hypernyms.add(lemmas[0])
+                    else:
+                        hypernyms.add(lemmas[1])
         return hypernyms
 
     def get_candidate_set(self, token, pos=None):

@@ -5,6 +5,7 @@ from nltk.corpus import stopwords
 import math
 import time
 from tqdm import tqdm
+from nltk.stem import WordNetLemmatizer
 import re
 
 
@@ -46,6 +47,7 @@ class SWOWInterface:
             for token in indices
         }
         self.candidate_cap = candidate_cap
+        self.wnl = WordNetLemmatizer()
 
     def init_response_table(self):
         """
@@ -133,7 +135,7 @@ class SWOWInterface:
                     pairs_to_strength[(cue, response)] /= total
 
         return pairs_to_strength, cues_to_index, responses
-
+    
     def read_in_pos_freq(self):
         """
         reads in and returns the most frequent part of speech for a token
@@ -332,9 +334,11 @@ class SWOWInterface:
         total_strength = np.array(
             [
                 self.get_association_strength(token, candidate)
-                for candidate in self.get_candidate_set(token)
+                for candidate in neighbours
             ]
         ).sum()
+        if total_strength==0 and len(neighbours)!= 0:
+            breakpoint()
         return {
             neighbour: self.get_association_strength(token, neighbour) / total_strength
             for neighbour in neighbours
