@@ -24,8 +24,8 @@ from wordnet_interface import WordNetInterface
 from swow_interface import SWOWInterface
 import torch
 
-
-def urban_extractor(filepath, use_unsure):
+# Sentence extractor function for Verb-Object-Dataset (Knuples et al., 2026)
+def knuples_extractor(filepath, use_unsure):
     sentences = []
     fail_counter = 0
     not_agree_counter = 0
@@ -74,7 +74,7 @@ def urban_extractor(filepath, use_unsure):
     )
     return sentences
 
-
+# Sentence extractor function for Wordnet-Verbs-Dataset (Mohammad et al., 2016)
 def mohammad_extractor(filepath, use_unsure):
     sentences = []
     fail_counter = 0
@@ -111,12 +111,11 @@ def mohammad_extractor(filepath, use_unsure):
 
 
 if __name__ == "__main__":
-    RANDOM_SEED = 53
+    RANDOM_SEED = 53 # seed used in our thesis
     DATA_DIR = "/projekte/semrel/WORK-AREA/Users/navid"
     WORDNET_DIR = "/resources/data/WordNet/WordNet-3.0_extract/"
-    URBAN_DIR = "/projekte/semrel/Annotations/Figurative-Language/multilingual_EN_DE_SI_lit-fig_v-obj_abstract-concrete/English"
+    knuples_DIR = "/projekte/semrel/Annotations/Figurative-Language/multilingual_EN_DE_SI_lit-fig_v-obj_abstract-concrete/English"
     SWOW_DIR = "/projekte/semrel/WORK-AREA/Users/navid/SWOW-EN18"
-    # print(torch.cuda.get_device_name())
     print("loading interfaces")
     # swow_r1 = SWOWInterface(
     #     number_of_responses=1, strength_file="strength.SWOW-EN.R1.20180827.csv"
@@ -156,9 +155,9 @@ if __name__ == "__main__":
     # swow_r1_ppmi = SWOWInterface(number_of_responses=1, use_ppmi=True)
     wn = WordNetInterface()
     print("loading embeddings")
-    urban_dataset = "/projekte/semrel/Annotations/Figurative-Language/multilingual_EN_DE_SI_lit-fig_v-obj_abstract-concrete/English/example_sentences_verb-object.tsv"
     fasttext_dir = "/projekte/semrel/WORK-AREA/Users/navid/wiki.en.bin"
     fasttext_2_dir = "/projekte/semrel/WORK-AREA/Users/navid/cc.en.300.bin"
+    knuples_dataset = "/projekte/semrel/Annotations/Figurative-Language/multilingual_EN_DE_SI_lit-fig_v-obj_abstract-concrete/English/example_sentences_verb-object.tsv"
     mohammad_dataset = "/projekte/semrel/WORK-AREA/Users/navid/Metaphor-Emotion-Data-Files/Data-metaphoric-or-literal.txt"
     # swow_embeddings_r1 = WordAssociationEmbeddings(
     #     swow=swow_r1,
@@ -215,16 +214,16 @@ if __name__ == "__main__":
     #     os.path.join(DATA_DIR, "graph_embeddings/n2v_r1_sg.kv"), swow=swow_r1
     # )
     print("loading datasets")
-    urban_data_unsure = DataSet(
-        filepath=urban_dataset,
-        extraction_function=urban_extractor,
+    knuples_data_unsure = DataSet(
+        filepath=knuples_dataset,
+        extraction_function=knuples_extractor,
         use_unsure=False,
         test_seed=RANDOM_SEED,
         test_split_size=0.2,
     )
-    urban_data_unsure = DataSet(
-        filepath=urban_dataset,
-        extraction_function=urban_extractor,
+    knuples_data_unsure = DataSet(
+        filepath=knuples_dataset,
+        extraction_function=knuples_extractor,
         use_unsure=True,
         test_seed=RANDOM_SEED,
         test_split_size=0.2,
@@ -237,10 +236,10 @@ if __name__ == "__main__":
     #     test_split_size=0.2,
     # )
     print("loading models")
-    swow_embeddings_matrix=NThresholdModel(data=urban_data_unsure,candidate_source=wn,mean_multi_word=False,fit_embeddings=swow_embeddings_r12_ppmi,score_embeddings=swow_embeddings_r12_ppmi,use_output_vec=False,apply_candidate_weight=False,restrict_pos=["v"],num_classes=3)
+    swow_embeddings_matrix=NThresholdModel(data=knuples_data_unsure,candidate_source=wn,mean_multi_word=False,fit_embeddings=swow_embeddings_r12_ppmi,score_embeddings=swow_embeddings_r12_ppmi,use_output_vec=False,apply_candidate_weight=False,restrict_pos=["v"],num_classes=3)
 
     # swow_candidates_r1_mean_phrase_bare = ContextualMaoModel(
-    #     data=urban_data,
+    #     data=knuples_data,
     #     candidate_source=swow_r1,
     #     mean_multi_word=True,
     #     fit_embeddings=contextual_embeddings_l12_mean,
@@ -250,7 +249,7 @@ if __name__ == "__main__":
     #     restrict_pos=None,
     # )
     # swow_candidates_r1_mean_phrase_c2 = ContextualMaoModel(
-    #     data=urban_data,
+    #     data=knuples_data,
     #     candidate_source=swow_r1_c2,
     #     mean_multi_word=True,
     #     fit_embeddings=contextual_embeddings_l12_mean,
@@ -260,7 +259,7 @@ if __name__ == "__main__":
     #     restrict_pos=None,
     # )
     # swow_candidates_r1_mean_phrase_weighted = ContextualMaoModel(
-    #     data=urban_data,
+    #     data=knuples_data,
     #     candidate_source=swow_r1_c2,
     #     mean_multi_word=True,
     #     fit_embeddings=contextual_embeddings_l12_mean,
@@ -270,7 +269,7 @@ if __name__ == "__main__":
     #     restrict_pos=None,
     # )
     # swow_candidates_r1_mean_phrase_restricted = ContextualMaoModel(
-    #     data=urban_data,
+    #     data=knuples_data,
     #     candidate_source=swow_r1_c2,
     #     mean_multi_word=True,
     #     fit_embeddings=contextual_embeddings_l12_mean,
@@ -280,7 +279,7 @@ if __name__ == "__main__":
     #     restrict_pos=["v"],
     # )
     # swow_candidates_r1_mean_phrase_weighted_restricted = ContextualMaoModel(
-    #     data=urban_data,
+    #     data=knuples_data,
     #     candidate_source=swow_r1_c2,
     #     mean_multi_word=True,
     #     fit_embeddings=contextual_embeddings_l12_mean,
@@ -290,7 +289,7 @@ if __name__ == "__main__":
     #     restrict_pos=["v"],
     # )
     # random_baseline = RandomBaseline(
-    #     data=urban_data,
+    #     data=knuples_data,
     #     candidate_source=swow_r1_c2,
     #     score_embeddings=ft_embeddings_swow_r1,
     #     restrict_pos=["v"],
