@@ -1,5 +1,4 @@
-*.ipynb
-*.txt
+Implementation/*.txt
 *.bz2
 *.bin
 *.csv
@@ -7,5 +6,6 @@
 *.tsv
 model_distributions
 model_evaluations
+model_results
 recall_curves
 __pycache__
