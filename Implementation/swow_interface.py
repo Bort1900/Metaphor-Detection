@@ -1,39 +1,36 @@
-import pandas as pd
 import os
 import numpy as np
 from nltk.corpus import stopwords
 import math
-import time
-from tqdm import tqdm
 from nltk.stem import WordNetLemmatizer
 import re
+from wordnet_interface import CandidateSource
 
 
-class SWOWInterface:
+class SWOWInterface(CandidateSource):
     def __init__(
         self,
-        number_of_responses,
-        strength_file=None,
-        use_ppmi=False,
-        candidate_cap=0,
+        number_of_responses: int,
+        response_file: str,
+        strength_file: str | None = None,
+        use_ppmi: bool = False,
+        candidate_cap: int = 0,
     ):
         """
         Interface for the Small World of Words Word Association Data by Simon De Deyne that can give out candidate sets for words
         the data consists of cues where people have given three responses they associate with the cue word
-        number_of_responses: the number of responses (max 3) to take into account
-        strength_file: if exists a tsv file with the columns cue, response, number of mentions, total number of responses to the cue, association strength, if None it will be generated
-        use_ppmi: whether to use pointwise mutual information as a measure for the association strength when there is no strength file
-        candidate_cap: number of occurences a candidate needs to have for it to appear in the candidate set
+        :param number_of_responses: the number of responses (max 3) to take into account
+        :param response_file: filepath to the file listing the three responses for all cues and all participants
+        :param strength_file: if exists a tsv file with the columns cue, response, number of mentions, total number of responses to the cue, association strength, if None it will be generated
+        :param use_ppmi: whether to use pointwise mutual information as a measure for the association strength when there is no strength file
+        :param candidate_cap: number of occurences a candidate needs to have for it to appear in the candidate set
         """
-        self.work_dir = "/projekte/semrel/WORK-AREA/Users/navid/SWOW-EN18"
         self.strength_file = strength_file
-        self.response_file = "SWOW-EN.complete.20180827.csv"
+        self.response_file = response_file
         self.stops = stopwords.words("english")
         self.num_responses = number_of_responses
         self.use_ppmi = use_ppmi
-        self.cues_to_responses, self.responses_to_cues, self.cue_response_count = (
-            self.init_response_table()
-        )
+        self.cue_response_count, self.responses_to_cues = self.init_response_table()
         self.most_frequent_pos = self.read_in_pos_freq()
         (
             self.association_strength_matrix,
@@ -49,20 +46,18 @@ class SWOWInterface:
         self.candidate_cap = candidate_cap
         self.wnl = WordNetLemmatizer()
 
-    def init_response_table(self):
+    def init_response_table(
+        self,
+    ) -> tuple[dict[str, dict[str, int]], dict[str, set[str]]]:
         """
-        returns three dictionaries
-        cues_to_responses: a list of responses for every cue
+        returns two dictionaries
+        cue_response_count: a dict of number of occurences for every cue and response
         responses_to_cues: a list of cues for every response
-        cue_response_count: a dict of number of occurence for every cue and response
         """
         space_regex = re.compile(f"\\s")
-        cues_to_responses = dict()
-        responses_to_cues = dict()
+        responses_to_cues: dict[str, set[str]] = dict()
         cue_response_amounts = dict()
-        with open(
-            os.path.join(self.work_dir, self.response_file), "r", encoding="utf-8"
-        ) as assocs:
+        with open(self.response_file, "r", encoding="utf-8") as assocs:
             assocs.readline()
             for line in assocs:
                 values = [item.strip()[1:-1] for item in line.split(",")]
@@ -77,10 +72,6 @@ class SWOWInterface:
                 ]
                 if len(responses) == 0:
                     continue
-                if cue in cues_to_responses:
-                    cues_to_responses[cue].update(responses)
-                else:
-                    cues_to_responses[cue] = set(responses)
                 if not cue in cue_response_amounts:
                     cue_response_amounts[cue] = {"#Total_Count#": 0}
                 for response in responses:
@@ -93,16 +84,18 @@ class SWOWInterface:
                         cue_response_amounts[cue][response] += 1
                     else:
                         cue_response_amounts[cue][response] = 1
-        return (cues_to_responses, responses_to_cues, cue_response_amounts)
+        return (cue_response_amounts, responses_to_cues)
 
-    def calculate_strengths(self):
+    def calculate_strengths(
+        self,
+    ) -> tuple[dict[tuple[str, str], float], dict[str, int], list[str]]:
         """
-        returns the association strengths of cue response pairs as a dict, the cue indices as a cue,index dict and set of responses that are not cues
+        returns the association strengths of cue response pairs as a dict, the cue indices as a cue,index dict and a list of responses that are not cues
         """
         cues_to_index = dict()
         responses = set()
         pairs_to_strength = dict()
-        num_cues = len(self.cues_to_responses)
+        num_cues = len(self.cue_response_count)
         for i, cue in enumerate(self.cue_response_count):
             cues_to_index[cue] = i
             for response in self.cue_response_count[cue]:
@@ -134,9 +127,10 @@ class SWOWInterface:
                 if (cue, response) in pairs_to_strength:
                     pairs_to_strength[(cue, response)] /= total
 
-        return pairs_to_strength, cues_to_index, responses
-    
-    def read_in_pos_freq(self):
+        responses.difference_update(cues_to_index.keys())
+        return pairs_to_strength, cues_to_index, list(responses)
+
+    def read_in_pos_freq(self) -> dict[str, str]:
         """
         reads in and returns the most frequent part of speech for a token
         """
@@ -147,7 +141,7 @@ class SWOWInterface:
                 most_frequent[pair[0]] = pair[1]
         return most_frequent
 
-    def get_pos(self, token):
+    def get_pos(self, token: str) -> str:
         """
         returns most frequent part of speech for a token according to frequency file, defaults to noun
         """
@@ -162,7 +156,9 @@ class SWOWInterface:
         else:
             return tag
 
-    def read_in_strengths(self):
+    def read_in_strengths(
+        self,
+    ) -> tuple[dict[tuple[str, str], float], dict[str, int], list[str]]:
         """
         reads in and returns from self.strength_file the association strengths of cue response pairs as a dict, the cue indices as a cue,index dict and set of responses that are not cues
 
@@ -171,9 +167,9 @@ class SWOWInterface:
         pairs_to_strength = dict()
         cue_to_index = dict()
         responses = set()
-        with open(
-            os.path.join(self.work_dir, self.strength_file), "r", encoding="utf-8"
-        ) as strengths:
+        if not self.strength_file:
+            raise ValueError("strength file cannot be none")
+        with open(self.strength_file, "r", encoding="utf-8") as strengths:
             strengths.readline()
             for line in strengths:
                 values = [value.strip() for value in line.split("\t")]
@@ -189,9 +185,11 @@ class SWOWInterface:
                 if cue not in cue_to_index:
                     cue_to_index[cue] = len(cue_to_index)
                 responses.add(response)
-        return pairs_to_strength, cue_to_index, responses
 
-    def write_strengths_to_file(self, filepath):
+        responses.difference_update(cue_to_index.keys())
+        return pairs_to_strength, cue_to_index, list(responses)
+
+    def write_strengths_to_file(self, filepath: str):
         """
         writes the strengths to a file in the strenght file tsv format cue,response,response count, cue count, strength
         """
@@ -229,7 +227,7 @@ class SWOWInterface:
                         + "\n"
                     )
 
-    def get_relative_probability(self, cue, response):
+    def get_relative_probability(self, cue: str, response: str) -> float:
         """
         returns the relative probability that the response has been given to this cue
         """
@@ -242,7 +240,7 @@ class SWOWInterface:
             / self.cue_response_count[cue]["#Total_Count#"]
         )
 
-    def init_strength_table(self):
+    def init_strength_table(self) -> tuple[np.ndarray, dict[str, int], dict[str, int]]:
         """
         returns the association strength matrix and the cue and response indices for navigating the matrix
         """
@@ -250,7 +248,6 @@ class SWOWInterface:
             pairs_to_strength, cue_to_index, responses = self.calculate_strengths()
         else:
             pairs_to_strength, cue_to_index, responses = self.read_in_strengths()
-        responses.difference_update(cue_to_index.keys())
         num_cues = len(cue_to_index)
         response_to_index = {
             response: i + num_cues for i, response in enumerate(responses)
@@ -272,7 +269,7 @@ class SWOWInterface:
             ]
         return association_strength_matrix, cue_to_index, response_to_index
 
-    def get_num_occurrences(self, word_1, word_2):
+    def get_num_occurrences(self, word_1: str, word_2: str) -> int:
         """
         returns the number of times one of the two words has been given as a response to the other one
         """
@@ -289,17 +286,18 @@ class SWOWInterface:
             total += self.cue_response_count[word_2][word_1]
         return total
 
-    def get_neighbours(self, word, directional=False):
+    def get_neighbours(self, word: str, directional: bool = False) -> list[str]:
         """
         returns all the neighbours to the word in the word association graph
         :param directional: whether the neighbours that are cues to the word should be given in addition to the responses, True: only responses
         """
         output = []
-        if word in self.cues_to_responses:
+        if word in self.cue_response_count:
             output += [
                 response
-                for response in self.cues_to_responses[word]
+                for response in self.cue_response_count[word]
                 if self.get_num_occurrences(word, response) >= self.candidate_cap
+                and response != "#Total_Count#"
             ]
 
         if word in self.responses_to_cues and not directional:
@@ -311,22 +309,22 @@ class SWOWInterface:
 
         return output
 
-    def get_candidate_set(self, word, pos=None):
+    def get_candidate_set(self, token: str, pos: list[str] | None = None) -> set[str]:
         """
-        returns all the responses given to the word and all the cues the word was given as a response to
+        returns all the responses given to the token and all the cues the token was given as a response to as well as the token itself
         :param pos: list of parts of speech, restricts result to a certain part of speech if given(v:verb,n:noun,a:adjective)
         """
         output = set(
             [
                 token
-                for token in self.get_neighbours(word, directional=False)
+                for token in self.get_neighbours(token, directional=False)
                 if not pos or self.get_pos(token) in pos
             ]
         )
-        output.add(word)
+        output.add(token)
         return output.difference(self.stops)
 
-    def get_weighted_neighbours(self, token):
+    def get_weighted_neighbours(self, token: str) -> dict[str, float]:
         """
         returns a dictionary that gives the association strength for all neighbours of the token in the word association graph
         """
@@ -337,7 +335,7 @@ class SWOWInterface:
                 for candidate in neighbours
             ]
         ).sum()
-        if total_strength==0 and len(neighbours)!= 0:
+        if total_strength == 0 and len(neighbours) != 0:
             breakpoint()
         return {
             neighbour: self.get_association_strength(token, neighbour) / total_strength
@@ -345,7 +343,7 @@ class SWOWInterface:
         }
 
     def get_association_strength(
-        self, word_1: str, word_2: str, directional=False
+        self, word_1: str, word_2: str, directional: bool = False
     ) -> float:
         """
         returns the association strength of the two words  word association graph
@@ -365,10 +363,12 @@ class SWOWInterface:
             strength += self.association_strength_matrix[response_index, cue_index]
         return strength
 
-    def get_association_strength_matrix(self, use_only_cues=True):
+    def get_association_strength_matrix(
+        self, use_only_cues: bool = True
+    ) -> tuple[np.ndarray, dict[str, int]]:
         """
         returns the association strength matrix and the indices to navigate the matrix
-        use_only_cues: if True only the cues will be in the CxC matrix, if False the responses will also be in the (C+R)x(C+R) matrix
+        :param use_only_cues: if True only the cues will be in the CxC matrix, if False the responses will also be in the (C+R)x(C+R) matrix
         """
         if use_only_cues:
             num_cues = len(self.cue_indices)
@@ -379,7 +379,7 @@ class SWOWInterface:
         else:
             return self.association_strength_matrix, self.combined_cue_response_indices
 
-    def get_nodes(self, only_cues=False):
+    def get_nodes(self, only_cues: bool = False) -> list[str]:
         """
         Returns all the nodes in the word association graph
 

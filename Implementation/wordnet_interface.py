@@ -5,112 +5,29 @@ from nltk.corpus import stopwords
 from nltk.corpus import wordnet as wn
 
 
-class WordNetInterface:
+class CandidateSource:
     def __init__(self):
-        # self.work_dir = "/resources/data/WordNet/WordNet-3.0_extract"
-        # self.token_to_synset_ids, self.synset_id_to_token, self.hypernym_synsets = (
-        #    self.init_index_tables()
-        # )
+        """
+        Class for creating candidate sets for the prediction of best candidates
+        """
+
+    def get_candidate_set(self, token: str, pos: list[str] | None = None) -> set:
+        """
+        returns the candidate set for predicting the best fitting candidate including the token itself
+        :param token: the word for which the candidate set is generated:
+        :param pos: list of parts of speech to which candidates will be restricted
+        """
+        return set()
+
+
+class WordNetInterface(CandidateSource):
+    def __init__(self):
         """
         Interface from getting the candidate sets from wordnet synonyms and hypernyms
         """
         self.stops = stopwords.words("english")
 
-    # def init_index_tables(self):
-    #     """
-    #     deprecated
-    #     """
-    #     # token to synset tables
-    #     nouns = pd.read_csv(
-    #         os.path.join(self.work_dir, "noun-synsets.txt"),
-    #         delimiter="\t",
-    #         header=None,
-    #         names=["token", "ids", "ambiguity"],
-    #         dtype={"token": str, "ids": str, "ambiguity": int},
-    #     )
-    #     verbs = pd.read_csv(
-    #         os.path.join(self.work_dir, "verb-synsets.txt"),
-    #         delimiter="\t",
-    #         header=None,
-    #         names=["token", "ids", "ambiguity"],
-    #         dtype={"token": str, "ids": str, "ambiguity": int},
-    #     )
-    #     nouns["POS"] = "NN"
-    #     verbs["POS"] = "V"
-    #     token_to_synset = pd.concat([nouns, verbs])
-    #     token_to_synset["ids"] = token_to_synset["ids"].apply(
-    #         lambda x: [int(id) for id in x.split(",")]
-    #     )
-
-    #     # synset to token tables
-    #     syn_nouns = pd.read_csv(
-    #         os.path.join(self.work_dir, "synset-nouns.txt"),
-    #         delimiter="\t",
-    #         header=None,
-    #         names=["id", "tokens"],
-    #         dtype={"id": int, "tokens": str},
-    #     )
-    #     syn_verbs = pd.read_csv(
-    #         os.path.join(self.work_dir, "synset-verbs.txt"),
-    #         delimiter="\t",
-    #         header=None,
-    #         names=["id", "tokens"],
-    #         dtype={"id": int, "tokens": str},
-    #     )
-    #     syn_nouns["POS"] = "NN"
-    #     syn_verbs["POS"] = "V"
-    #     synset_to_token = pd.concat([syn_nouns, syn_verbs])
-    #     synset_to_token["tokens"] = synset_to_token["tokens"].apply(
-    #         lambda x: [token.strip() for token in str(x).split(",")]
-    #     )
-
-    #     # hypernym tables
-    #     noun_hypernyms = pd.read_csv(
-    #         os.path.join(self.work_dir, "hyp_nouns.txt"),
-    #         delimiter="\t",
-    #         header=None,
-    #         names=["hyponym", "hypernyms"],
-    #         dtype={"hyponym": str, "hypernyms": str},
-    #     )
-    #     verb_hypernyms = pd.read_csv(
-    #         os.path.join(self.work_dir, "hyp_verbs.txt"),
-    #         delimiter="\t",
-    #         header=None,
-    #         names=["hyponym", "hypernyms"],
-    #         dtype={"hyponym": str, "hypernyms": str},
-    #     )
-    #     noun_hypernyms["POS"] = "NN"
-    #     verb_hypernyms["POS"] = "V"
-    #     hypernyms = pd.concat([noun_hypernyms, verb_hypernyms])
-    #     hypernyms["hypernyms"] = hypernyms["hypernyms"].apply(
-    #         lambda x: [token.strip() for token in str(x).split(",")]
-    #     )
-
-    #     return token_to_synset, synset_to_token, hypernyms
-
-    # def get_synset_ids(self, token, pos):
-    #     """
-    #     deprecated
-    #     """
-    #     return (
-    #         self.token_to_synset_ids[
-    #             (self.token_to_synset_ids["token"] == token)
-    #             & (self.token_to_synset_ids["POS"] == pos)
-    #         ]["ids"]
-    #         .explode()
-    #         .tolist()
-    #     )
-
-    # def get_tokens_from_id(self, id, pos):
-    #     """
-    #     deprecated
-    #     """
-    #     return self.synset_id_to_token[
-    #         (self.synset_id_to_token["id"] == id)
-    #         & (self.synset_id_to_token["POS"] == pos)
-    #     ].iloc[0]["tokens"]
-
-    def get_synonyms(self, token, pos=None):
+    def get_synonyms(self, token: str, pos: str | None = None) -> set:
         """
         gets all the synonymic synsets from wordnet and returns a set of their lemmas
 
@@ -127,7 +44,7 @@ class WordNetInterface:
                     synonyms.add(lemmas[1])
         return synonyms
 
-    def get_hypernyms(self, token, pos=None):
+    def get_hypernyms(self, token: str, pos: str | None = None) -> set:
         """
         gets all the hypernymic synsets from wordnet and returns a set of their lemmas
 
@@ -145,7 +62,7 @@ class WordNetInterface:
                         hypernyms.add(lemmas[1])
         return hypernyms
 
-    def get_candidate_set(self, token, pos=None):
+    def get_candidate_set(self, token: str, pos: list[str] | None = None) -> set:
         """
         gets all the synonymic and hypernymic synsets from wordnet and returns a set of their lemmas and the token
 
