@@ -1,14 +1,10 @@
-from typing import Self, overload
+from typing import Generic, TypeVar
 import fasttext
 from sklearn.decomposition import PCA
 import numpy as np
-from torch import Value
-from wordnet_interface import WordNetInterface
 from swow_interface import SWOWInterface
 from nltk.corpus import wordnet as wn
-from nltk.corpus import stopwords
 from data import Sentence
-import time
 from nltk.stem import WordNetLemmatizer
 import os
 from tqdm import tqdm
@@ -18,16 +14,17 @@ from transformers import BertModel, BertTokenizerFast
 from gensim.models import Word2Vec, KeyedVectors
 
 
-class Embeddings:
+T = TypeVar("T")
+
+
+class Embeddings(Generic[T]):
     def __init__(self):
         """
         Class to create embeddings for tokens
         """
         pass
 
-    def get_mean_vector(
-        self, tokens: list[str], use_output_vecs: bool = False
-    ) -> np.ndarray:
+    def get_mean_vector(self, tokens: list[str], use_output_vecs: bool = False) -> T:
         """
         returns the mean pooled embeddings for a list of tokens
         tokens: list of tokens whose embeddings are mean pooled
@@ -52,13 +49,13 @@ class Embeddings:
 
     def get_input_vector(
         self, token: str, exclude_sent: Sentence | None = None, pos: str | None = None
-    ) -> np.ndarray:
+    ) -> T:
         """
         returns the standard embeddings
         :param token: token for which embeddings are returned
         :param pos: part of speech of the token if known
         """
-        return np.zeros([1])
+        raise NotImplementedError
 
     def get_output_vector(self, token: str) -> np.ndarray:
         """
@@ -66,10 +63,10 @@ class Embeddings:
 
         :param token: token for which embedding is returned
         """
-        return np.zeros([1])
+        raise NotImplementedError
 
 
-class FasttextModel(Embeddings):
+class FasttextModel(Embeddings[np.ndarray]):
     def __init__(self, load_file: str, fallback_source):
         """
         Wrapper for Fasttext embeddings
@@ -121,26 +118,13 @@ class FasttextModel(Embeddings):
                 ]
                 if len(spare_candidates) == 0 and len(pool) <= pool_size * 2:
                     raise ValueError("Could not create embedding for unknowwn word")
-                if len(spare_candidates) ==0:
+                if len(spare_candidates) == 0:
                     print(pool)
             return self.get_mean_vector(tokens=spare_candidates, use_output_vecs=True)
         return self.output_matrix[word_id]
 
-    # def train(self, min_count=1):
-    #     model = fasttext.train_unsupervised(input=self.data_file, model=self.model_type, min_count=min_count)
-    #     model.save_model(self.save_file)
-    #     self.model = model
 
-    # @staticmethod
-    # def loadModel(load_file, model_type, alternative_filename=None):
-    #     save_file = load_file if not alternative_filename else alternative_filename
-    #     load =
-    #     model = FasttextModel(save_file, model_type)
-    #     model.model = load
-    #     return model
-
-
-class WordAssociationEmbeddings(Embeddings):
+class WordAssociationEmbeddings(Embeddings[np.ndarray]):
     def __init__(self, swow: SWOWInterface, index_file: str, embedding_file: str):
         """
         Class for graph embeddings for Word Association strength graph
@@ -241,7 +225,7 @@ class WordAssociationEmbeddings(Embeddings):
             return weighted_mean
 
 
-class BertEmbeddings(Embeddings):
+class BertEmbeddings(Embeddings[torch.Tensor]):
     def __init__(
         self,
         layers: list[int],
@@ -261,8 +245,9 @@ class BertEmbeddings(Embeddings):
             output_hidden_states=True,
             cache_dir=os.path.join("/projekte/semrel/WORK-AREA/Users/navid", "bert"),
         )
-        if torch.cuda.is_available():
-            self.model.to(torch.device("cuda"))
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model = self.model.to(device)
+
         self.tokenizer = BertTokenizerFast.from_pretrained("bert-base-uncased")
         self.lookup_table = dict()
         self.use_phrase_embedding = use_phrase_embedding
@@ -367,7 +352,7 @@ class BertEmbeddings(Embeddings):
         return torch.stack(embeddings).mean(dim=0)
 
     def get_input_vector(
-        self, token: str, pos: str | None = None, exclude_sent=None
+        self, token: str, exclude_sent=None, pos: str | None = None
     ) -> torch.Tensor:
         """
         returns the contextual embeddings by mean pooling word net examples for the token
@@ -453,7 +438,7 @@ class Node2VecEmbeddings(Embeddings):
         token: str,
         exclude_sent: Sentence | None = None,
         pos: str | None = None,
-    )->np.ndarray:
+    ) -> np.ndarray:
         """
         returns the standard embeddings
         :param token: token for which embeddings are returned
@@ -482,7 +467,13 @@ class Node2VecEmbeddings(Embeddings):
 
 
 class Node2VecEmbeddingsCreator:
-    def __init__(self, graph: SWOWInterface, is_directed:bool=False, p:float=1, q:float=1):
+    def __init__(
+        self,
+        graph: SWOWInterface,
+        is_directed: bool = False,
+        p: float = 1,
+        q: float = 1,
+    ):
         """
         Class for creating Node2Vec Embeddings following the original implementation(slightly adapted) by Aditya Grover and Jure Leskovec.
         See https://github.com/aditya-grover/node2vec/tree/master

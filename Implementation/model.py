@@ -123,17 +123,9 @@ class NThresholdModel:
         for sentence in tqdm(data):
             if by_pos and sentence.pos not in by_pos:
                 continue
-            # print(sentence.sentence, sentence.phrase, sentence.value)
-            # print(
-            #     self.candidate_source.get_candidate_set(
-            #         sentence.target, pos=sentence.pos
-            #     )
-            # )
             try:
                 prediction = int(self.predict(sentence, by_phrase=by_phrase))
-                # print(prediction)
             except ValueError:
-                # print(f"{sentence.target} not in dictionary, ignoring sentence")
                 ignore_count += 1
                 continue
             confusion_matrix[prediction, sentence.value] += 1
@@ -352,7 +344,7 @@ class NThresholdModel:
                 labels[i] = sentence.value
             except ValueError:
                 fail_count += 1
-                print(f"{sentence.target} not in dictionary, ignoring sentence")
+                #print(f"{sentence.target} not in dictionary, ignoring sentence")
                 continue
         print(f"ignored {fail_count} sentences of {len(data)}")
         sorted_scores = sorted(scores.keys(), key=lambda x: scores[x])
@@ -409,7 +401,7 @@ class NThresholdModel:
         num_classes = len(scores)
         confusion_matrix = np.zeros([num_classes, num_classes])
         for j in range(num_classes):
-            indices=[0]
+            indices = [0]
             for i, threshold in enumerate(thresholds):
                 length = len(scores[j])
                 upper = length - 1
@@ -421,15 +413,15 @@ class NThresholdModel:
                     elif scores[j][index] < threshold:
                         lower = index + 1
                     else:
-                        upper=index
-                        lower=index
-                if lower == length-1 and scores[j][lower]<threshold:
-                    lower=length
-                    upper=length
+                        upper = index
+                        lower = index
+                if lower == length - 1 and scores[j][lower] < threshold:
+                    lower = length
+                    upper = length
                 indices.append(lower)
-                confusion_matrix[i,j]=indices[i+1]-indices[i]
-                if i == num_classes-2:
-                    confusion_matrix[i+1,j]=length-indices[i+1]
+                confusion_matrix[i, j] = indices[i + 1] - indices[i]
+                if i == num_classes - 2:
+                    confusion_matrix[i + 1, j] = length - indices[i + 1]
         return confusion_matrix
 
     def evaluate_per_threshold(
@@ -578,89 +570,6 @@ class MaoModel(NThresholdModel):
             apply_candidate_weight=apply_candidate_weight,
         )
 
-    # def train_threshold(self, increment, epochs, batch_size=-1):
-    #     """
-    #     deprecated
-    #     looks for optimal threshold by approximating recall to precision
-    #     :param increment: initial threshold change when approximating
-    #     :param epochs: number of times to go over development data
-    #     :param batch_size: number of datapoints after which threshold is aligned, if -1 the dataset will not be separated into batches
-    #     """
-
-    #     if batch_size < 0:
-    #         batch_number = len(self.dev_data)
-    #     else:
-    #         batch_number = math.floor(len(self.dev_data) / batch_size)
-    #     alternating_counter = 0  # checks for jumping over optimum
-    #     for i in range(epochs):
-    #         random.shuffle(self.dev_data)
-    #         print(f"epoch {i+1}:")
-    #         batch_start = 0
-    #         for _ in range(batch_number):
-    #             scores = self.evaluate(
-    #                 self.dev_data[batch_start : batch_start + batch_size]
-    #             )[0]
-    #             print(
-    #                 f'Current_threshold: {self.decision_threshold}\nBatch F-score: {scores["macro_f_1"]}'
-    #             )
-    #             batch_start += batch_size
-    #             if scores["recall"] < scores["precision"]:
-    #                 self.decision_threshold += increment
-    #                 alternating_counter = max(0, alternating_counter * (-1) + 1)
-    #             elif scores["precision"] < scores["recall"]:
-    #                 self.decision_threshold -= increment
-    #                 alternating_counter = min(0, alternating_counter * (-1) - 1)
-    #             # 4 alternations between raising and lowering threshold
-    #             if abs(alternating_counter) >= 4:
-    #                 increment /= 2
-    #                 alternating_counter = 0
-    #             print(alternating_counter)
-
-    # def optimize_threshold(self, max_epochs=100):
-    #     """
-    #     deprecated
-    #     """
-    #     increment = 0.1
-    #     self.decision_threshold = 0
-    #     direction = 1  # 1:upwards, -1 downwards
-    #     lower_bound = 0
-    #     i = 0
-    #     upper_bound = 1
-    #     last_f_score = self.evaluate(self.dev_data)[0]["macro_f_1"]
-    #     while (
-    #         self.decision_threshold <= upper_bound
-    #         and self.decision_threshold >= lower_bound
-    #         and i < max_epochs
-    #     ):
-    #         self.decision_threshold += direction * increment
-    #         current_f_score = self.evaluate(self.dev_data)[0]["macro_f_1"]
-    #         if current_f_score < last_f_score:
-    #             if direction == 1:
-    #                 upper_bound = self.decision_threshold
-    #             else:
-    #                 lower_bound = self.decision_threshold
-    #             increment /= 2
-    #             direction *= -1
-    #         last_f_score = current_f_score
-    #         print(self.decision_threshold, last_f_score, lower_bound, upper_bound)
-    #         i += 1
-
-    # def find_best_threshold(self, steps):
-    #     """
-    #     deprecated
-    #     """
-    #     self.decision_threshold = 0
-    #     best_threshold = 0
-    #     best_f_score = 0
-    #     while self.decision_threshold < 1:
-    #         f_score = self.evaluate(self.dev_data)[0]["macro_f_1"]
-    #         if f_score > best_f_score:
-    #             best_f_score = f_score
-    #             best_threshold = self.decision_threshold
-    #         self.decision_threshold += steps
-    #     self.decision_threshold = best_threshold
-    #     print(f"Best Threshold: {self.decision_threshold}, F-Score: {best_f_score}")
-
 
 class ContextualMaoModel(NThresholdModel):
     def __init__(
@@ -758,243 +667,6 @@ class ContextualMaoModel(NThresholdModel):
         return best_candidate
 
 
-class ComparingModel(NThresholdModel):
-    def __init__(
-        self,
-        data: DataSet,
-        literal_embeddings: Embeddings,
-        associative_embeddings: Embeddings,
-        use_output_vec: bool,
-        num_classes: int = 2,
-    ):
-        """
-        model that compares literal and associative similarity and predicts metaphoricity with a threshold
-        :param data: DataSet instance to train thresholds and evaluate model
-        :param literal_embeddings: Semantic Embeddings for comparing
-        :param use_output_vec: whether ouput vectors(word2vec) should be used for comparing context to candidates
-        :param num_classes: number of classes to classify
-        :param associative_embeddings: WordAssociationEmbeddings instance
-        """
-        super().__init__(
-            data=data,
-            candidate_source=None,
-            mean_multi_word=False,
-            fit_embeddings=literal_embeddings,
-            score_embeddings=associative_embeddings,
-            use_output_vec=use_output_vec,
-            apply_candidate_weight=False,
-            num_classes=num_classes,
-        )
-        self.literal_embeddings = literal_embeddings
-        self.associative_embeddings = associative_embeddings
-        self.map_factor = 1  # mapping the size of one embedding space to the other for linear transform
-
-    def get_compare_value(self, sentence, by_phrase=False):
-        """
-        get a value by comparing literal and associative similarities to context
-        :param sentence: the Sentence instance for the calculation
-        :param by_phrase: if evaluation should only use phrase
-        """
-        try:
-            literal_similarity, associative_similarity = self.get_similarities(
-                sentence, by_phrase=by_phrase
-            )
-        except KeyError:
-            raise ValueError("could not calculate comparison value")
-        return self.map_factor * literal_similarity - associative_similarity
-
-    def get_similarities(self, sentence, by_phrase=False):
-        """
-        returns the literal and associative similarity of the target to the context
-        sentence: the Sentence instance for the calculation
-        :param by_phrase: if evaluation should only use phrase
-        """
-        if by_phrase and sentence.phrase != "unknown":
-            context = [word for word in sentence.phrase if word != sentence.target]
-        else:
-            context = [
-                word for word in sentence.context if word.lower() not in self.stops
-            ]
-        try:
-            literal_context_vec = self.literal_embeddings.get_mean_vector(
-                context, self.use_output
-            )
-            associative_context_vec = self.associative_embeddings.get_mean_vector(
-                context, self.use_output
-            )
-            if self.use_output:
-                literal_vec = self.literal_embeddings.get_output_vector(sentence.target)
-            else:
-                literal_vec = self.literal_embeddings.get_input_vector(sentence.target)
-            associative_vec = self.associative_embeddings.get_input_vector(
-                sentence.target
-            )
-        except KeyError:
-            raise KeyError("Could not calculate the necessary embeddings")
-        if type(literal_vec) == np.ndarray:
-            literal_similarity = Vectors.cos_sim(literal_context_vec, literal_vec)
-        elif type(literal_vec) == torch.Tensor:
-            literal_similarity = self.cos(literal_context_vec, literal_vec)
-        else:
-            raise TypeError(f"target vector of type {type(literal_vec)} not supported")
-        if not literal_similarity > 0 and not literal_similarity < 0:
-            literal_similarity = 0
-        if type(associative_vec) == np.ndarray:
-            associative_similarity = Vectors.cos_sim(
-                associative_context_vec, associative_vec
-            )
-        elif type(associative_vec) == torch.Tensor:
-            associative_similarity = self.cos(associative_context_vec, associative_vec)
-        else:
-            raise TypeError(
-                f"target vector of type {type(associative_vec)} not supported"
-            )
-        if not associative_similarity > 0 and not associative_similarity < 0:
-            associative_similarity = 0
-        return literal_similarity, associative_similarity
-
-    def evaluate_per_threshold(
-        self,
-        start: float,
-        steps: int,
-        increment: float,
-        save_file: str,
-        data: list[Sentence] | None = None,
-        by_pos: list[str] | None = None,
-        by_phrase: bool = False,
-    ):
-        """
-        writes some evaluation metrics into a file after evaluating the model with different thresholds
-        :param start: the first threshold to test
-        :param steps: the number of thresholds to test
-        :param increment: the difference between two thresholds to test
-        :param save_file: where to store the results
-        :param data: list of sentences to evaluate if specified else model test set
-        :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
-        :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
-        """
-        if not data:
-            data = self.test_data
-        self.estimate_map_factor(
-            by_pos=by_pos,
-        )
-        return super().evaluate_per_threshold(
-            start,
-            steps,
-            increment,
-            save_file,
-            by_pos=by_pos,
-            data=data,
-            by_phrase=by_phrase,
-        )
-
-    def estimate_map_factor(self, data: list[Sentence] | None = None, by_pos=None):
-        """
-        estimates the factor for mapping from one embedding space to the other using dev data
-
-        :param data: list of sentences to evaluate if specified else model train set
-        :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
-        """
-        # finding the ranges of the two embeddings spaces
-        if not data:
-            data = self.train_dev_data
-        print("estimating mapping factor")
-        smallest_literal = 10
-        smallest_associative = 10
-        largest_literal = -10
-        largest_associative = -10
-        ignore_count = 0
-        for sentence in data:
-            if by_pos and sentence.pos not in by_pos:
-                continue
-            try:
-                literal_similarity, associative_similarity = self.get_similarities(
-                    sentence
-                )
-            except KeyError:
-                ignore_count += 1
-                continue
-            if literal_similarity < smallest_literal:
-                smallest_literal = literal_similarity
-            if literal_similarity > largest_literal:
-                largest_literal = literal_similarity
-            if associative_similarity < smallest_associative:
-                smallest_associative = associative_similarity
-            if associative_similarity > largest_associative:
-                largest_associative = associative_similarity
-
-        self.map_factor = (largest_associative - smallest_associative) / (
-            largest_literal - smallest_literal
-        )
-        print(f"ignored {ignore_count} of {len(data)} sentences")
-        print(f"mapping factor: {self.map_factor}")
-
-    def train_thresholds(
-        self,
-        data: list[Sentence] | None = None,
-        by_pos: list[str] | None = None,
-        by_phrase: bool = False,
-    ):
-        """
-        :param trains the model's threshold on the dev_data
-        :param data: list of sentences to evaluate if specified else model train set
-        :param by_pos: if specified, list of parts of speech, sentences whose target has this pos will be considered for evaluation
-        :param by_phrase: whether the evaluation will be phrase or sentence based, will default to sentence if phrase is unknown
-        """
-        if not data:
-            data = self.train_dev_data
-        ignore_count = 0
-        self.estimate_map_factor(by_pos=by_pos)
-        scores = dict()
-        labels = dict()
-        for i, sentence in enumerate(tqdm(data)):
-            if by_pos and sentence.pos not in by_pos:
-                continue
-            try:
-                scores[i] = self.get_compare_value(sentence, by_phrase=by_phrase)
-                labels[i] = sentence.value
-            except ValueError:
-                print(f"{sentence.target} not in dictionary, ignoring sentence")
-                continue
-        sorted_scores = sorted(scores.keys(), key=lambda x: scores[x])
-        labels = [labels[score] for score in sorted_scores]
-        all_scores = [scores[score] for score in scores]
-        last_score = -1
-        possible_thresholds = []
-        for score in sorted_scores:
-            score = scores[score]
-            if score != last_score:
-                possible_thresholds.append((score + last_score) / 2)
-            last_score = score
-        best_f_score = 0
-        best_threshold = [
-            possible_thresholds[i] for i in range(len(self.decision_thresholds))
-        ]
-        commutation_number: int = int(
-            comb(N=len(possible_thresholds), k=len(self.decision_thresholds))
-        )
-        current_commutation = [i for i in range(len(self.decision_thresholds))]
-        for commutation in tqdm(range(commutation_number)):
-            current_thresholds = [possible_thresholds[i] for i in current_commutation]
-            confusion_matrix = self.get_confusion_matrix(
-                scores=all_scores, labels=labels, thresholds=current_thresholds
-            )
-            f_score = self.calculate_scores(confusion_matrix=confusion_matrix)[
-                "macro_f_1"
-            ]
-            if f_score > best_f_score:
-                best_threshold = current_thresholds
-                best_f_score = f_score
-            if commutation < commutation_number - 1:
-                current_commutation = Vectors.get_next_commutation(
-                    current_commutation=current_commutation, n=len(possible_thresholds)
-                )
-        self.decision_thresholds = best_threshold
-        print(
-            f"Best Thresholds: {self.decision_thresholds}\nBest F_score:{best_f_score}"
-        )
-
-
 class RandomBaseline(NThresholdModel):
     def __init__(
         self,
@@ -1076,7 +748,7 @@ class Models:
                     class_counts[sentence.value] += 1
                     labels[i] = sentence.value
                 except ValueError:
-                    print(f"{sentence.target} not in dictionary, ignoring sentence")
+                    #print(f"{sentence.target} not in dictionary, ignoring sentence")
                     continue
             sorted_score_indices = sorted(scores.keys(), key=lambda x: scores[x])
             true_pos_rates = []
