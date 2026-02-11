@@ -1,0 +1,2 @@
+Decision thresholds: tensor(0.6509, device='cuda:0')
+{'precision_class_0': 0.49523809523809526, 'recall_class_0': 0.3939393939393939, 'f_1_class_0': 0.4388185654008439, 'precision_class_1': 0.5876288659793815, 'recall_class_1': 0.6826347305389222, 'f_1_class_1': 0.6315789473684211, 'macro_f_1': 0.5351987563846325, 'micro_f_1': 0.5464807185399255}

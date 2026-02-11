@@ -3,7 +3,7 @@ Implementation/*.txt
 *.bin
 *.csv
 *.npy
-*.tsv
+cue*
 model_distributions
 model_evaluations
 model_results

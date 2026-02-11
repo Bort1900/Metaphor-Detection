@@ -1,0 +1,2 @@
+Decision thresholds: 0.3800460398197174
+{'precision_class_0': 0.23529411764705882, 'recall_class_0': 0.26666666666666666, 'f_1_class_0': 0.25, 'precision_class_1': 0.835, 'recall_class_1': 0.8106796116504854, 'f_1_class_1': 0.8226600985221675, 'macro_f_1': 0.5363300492610837, 'micro_f_1': 0.7199919533687908}
